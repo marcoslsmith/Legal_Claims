@@ -96,6 +96,13 @@ export default function Leads() {
     const answers = (ans as any[] || []).map(a => ({ ...a, question: a.questions }));
     const answerMap: Record<string, string> = {};
     answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
+    // Some qualification fields may live on profile instead of answers.
+    if (lead.profile?.prior_attorney != null && !answerMap.prior_attorney) {
+      answerMap.prior_attorney = lead.profile.prior_attorney ? 'yes' : 'no';
+    }
+    if (lead.profile?.state && !answerMap.state) {
+      answerMap.state = lead.profile.state;
+    }
 
     const labelMap: Record<string, string> = {};
     (answers || []).forEach((a) => {
@@ -144,10 +151,12 @@ export default function Leads() {
       }
 
       if (!rule.is_disqualifying && !matched) {
+        const expected = describeExpected(rule);
+        const got = String(rawVal);
         insights.negative.push({
           field_key: rule.field_key,
           label,
-          reason: rule.description || 'This answer is not helping this case qualify',
+          reason: `Expected ${expected}, got "${got}"`,
         });
       }
     });
@@ -174,6 +183,27 @@ export default function Leads() {
       insights,
     });
     setDetailLoading(false);
+  };
+
+  const describeExpected = (rule: MatchingRule) => {
+    switch (rule.operator) {
+      case 'equals':
+        return `"${rule.value || ''}"`;
+      case 'not_equals':
+        return `a value other than "${rule.value || ''}"`;
+      case 'contains':
+        return `a value containing "${rule.value || ''}"`;
+      case 'in_list':
+        return `one of [${(rule.value_list || []).join(', ')}]`;
+      case 'greater_than':
+        return `a value greater than "${rule.value || ''}"`;
+      case 'less_than':
+        return `a value less than "${rule.value || ''}"`;
+      case 'between':
+        return `a value between "${rule.value_min || ''}" and "${rule.value_max || ''}"`;
+      default:
+        return 'the configured condition';
+    }
   };
 
   const updateStatus = async (newStatus: string) => {
