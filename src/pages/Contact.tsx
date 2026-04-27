@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, User, Mail, Phone } from 'lucide-react';
+import { ArrowRight, User, Mail, Phone, Shield, DollarSign, Scale, CheckCircle } from 'lucide-react';
 import { FlowStepper } from '../components/FlowStepper';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,24 @@ const FLOW_STEPS = [
   { label: 'Intake' },
   { label: 'Consent' },
   { label: 'Done' },
+];
+
+const trustPoints = [
+  {
+    icon: DollarSign,
+    title: 'You never pay out of pocket',
+    desc: 'Attorneys in mass tort and class action cases only get paid if they win compensation for you. No win, no fee — ever.',
+  },
+  {
+    icon: Scale,
+    title: 'Average settlements range from $25,000 to $500,000+',
+    desc: 'Depending on the case, claimants have received significant compensation for injuries caused by defective products, drugs, and corporate misconduct.',
+  },
+  {
+    icon: Shield,
+    title: 'Your information is private and secure',
+    desc: 'We use your contact details solely to connect you with a licensed attorney for your case. We never sell your data to marketers or third parties.',
+  },
 ];
 
 export default function Contact() {
@@ -36,7 +54,6 @@ export default function Contact() {
       else setEmail(user!.email || '');
       if (data.phone) setPhone(data.phone);
 
-      // Already have all contact info — skip ahead
       if (data.full_name && (data.email || user!.email) && data.phone) {
         navigate('/results', { replace: true });
         return;
@@ -89,18 +106,34 @@ export default function Contact() {
   return (
     <div className="min-h-[calc(100vh-56px)] bg-slate-50 flex flex-col">
       <FlowStepper steps={FLOW_STEPS} currentStep={1} />
-      <div className="max-w-lg mx-auto w-full px-4 sm:px-6 pt-4 pb-6 flex-1 flex flex-col">
+      <div className="max-w-lg mx-auto w-full px-4 sm:px-6 pt-4 pb-8 flex-1 flex flex-col">
 
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-5">
           <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Step 2 of 4 — Contact Info</p>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">How can we reach you?</h1>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">One step away from your results</h1>
           <p className="text-slate-500 text-sm mt-1.5 leading-relaxed">
-            We need this to connect you with legal professionals. Your information is never sold.
+            We use this to connect you with a licensed attorney for any claims you qualify for. No spam, no sales calls.
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5 flex-1">
+        {/* Trust signals */}
+        <div className="space-y-3 mb-5">
+          {trustPoints.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="flex items-start gap-3 bg-white rounded-2xl border border-slate-200 p-4">
+              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                <Icon size={16} className="text-blue-700" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900 leading-snug">{title}</p>
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Form */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
 
           {/* Full Name */}
           <div>
@@ -154,13 +187,15 @@ export default function Contact() {
               />
             </div>
             {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
-            <p className="text-xs text-slate-400 mt-1.5">We may call or text to discuss your claim.</p>
+            <p className="text-xs text-slate-400 mt-1.5">
+              An attorney may call or text to discuss your case. Standard messaging rates may apply.
+            </p>
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-colors text-sm min-h-[52px] mt-2"
+            className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-colors text-sm min-h-[52px] mt-1"
           >
             {saving ? (
               <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -170,9 +205,19 @@ export default function Contact() {
           </button>
         </div>
 
-        <p className="text-xs text-slate-400 text-center mt-4 px-4 leading-relaxed">
-          Your privacy is protected. We never sell your information to third parties.
-        </p>
+        {/* Bottom trust strip */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-4 px-2">
+          {[
+            'No fees unless you win',
+            'Never sold to marketers',
+            'Attorney review included',
+          ].map(t => (
+            <span key={t} className="flex items-center gap-1 text-xs text-slate-400">
+              <CheckCircle size={11} className="text-emerald-500 shrink-0" />
+              {t}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

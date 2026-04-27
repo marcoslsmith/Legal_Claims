@@ -17,6 +17,12 @@
     /* Better touch behavior */
     touch-action: manipulation;
   }
+  /* Prevent iOS Safari from auto-zooming into form inputs.
+     iOS zooms when focused font-size < 16px; this sets a floor without
+     changing the visual size (rem scaling still applies after focus). */
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
   /* Improve tap highlight */
   * {
     -webkit-tap-highlight-color: transparent;
