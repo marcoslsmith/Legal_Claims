@@ -46,7 +46,7 @@ export default function Results() {
       supabase.from('cases').select('*').eq('status', 'active').order('priority_score', { ascending: false }),
       supabase.from('matching_rules').select('*'),
       supabase.from('answers').select('*').eq('user_id', user!.id),
-      supabase.from('submissions').select('id, case_id, status, match_score, match_tier').eq('user_id', user!.id),
+      supabase.from('submissions').select('id, case_id, status, match_score, match_tier, prior_attorney_for_case').eq('user_id', user!.id),
       supabase.from('questions').select('field_key, question_text'),
     ]);
 
@@ -61,10 +61,14 @@ export default function Results() {
     const thresholds = { strongMatchMin: strongMin, possibleMatchMin: possibleMin };
 
     const map: Record<string, string> = {};
-    const subsByCaseId: Record<string, { id: string; status: string }> = {};
-    for (const sub of (userSubs || []) as Pick<Submission, 'id' | 'case_id' | 'status'>[]) {
+    const subsByCaseId: Record<string, { id: string; status: string; prior_attorney_for_case: boolean | null }> = {};
+    for (const sub of (userSubs || []) as Pick<Submission, 'id' | 'case_id' | 'status' | 'prior_attorney_for_case'>[]) {
       map[sub.case_id] = sub.status;
-      subsByCaseId[sub.case_id] = { id: sub.id, status: sub.status };
+      subsByCaseId[sub.case_id] = {
+        id: sub.id,
+        status: sub.status,
+        prior_attorney_for_case: sub.prior_attorney_for_case ?? null,
+      };
     }
     setSubmissionMap(map);
 
@@ -85,7 +89,15 @@ export default function Results() {
 
     const caseMatches: CaseMatch[] = cases.map(c => {
       const caseRules = allRules.filter(r => r.case_id === c.id);
-      const { score, disqualified } = scoreCaseMatch(caseRules, answerMap);
+      const caseAnswerMap = { ...answerMap };
+      const sub = subsByCaseId[c.id];
+      if (sub?.prior_attorney_for_case != null) {
+        const boolVal = sub.prior_attorney_for_case ? 'true' : 'false';
+        caseAnswerMap.prior_attorney_for_case = boolVal;
+        // Backward compatibility if any rules still reference prior_attorney.
+        caseAnswerMap.prior_attorney = boolVal;
+      }
+      const { score, disqualified } = scoreCaseMatch(caseRules, caseAnswerMap);
       const tier = tierFromScore(score, disqualified, thresholds);
       const missingInfo = caseRules
         .filter((r) => {

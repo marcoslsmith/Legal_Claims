@@ -97,8 +97,10 @@ export default function Leads() {
     const answerMap: Record<string, string> = {};
     answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
     // Some qualification fields may live on submission/profile instead of answers.
-    if (lead.prior_attorney_for_case != null && !answerMap.prior_attorney) {
-      answerMap.prior_attorney = lead.prior_attorney_for_case ? 'true' : 'false';
+    if (lead.prior_attorney_for_case != null) {
+      const boolVal = lead.prior_attorney_for_case ? 'true' : 'false';
+      if (!answerMap.prior_attorney) answerMap.prior_attorney = boolVal;
+      if (!answerMap.prior_attorney_for_case) answerMap.prior_attorney_for_case = boolVal;
     } else if (lead.profile?.prior_attorney != null && !answerMap.prior_attorney) {
       answerMap.prior_attorney = lead.profile.prior_attorney ? 'true' : 'false';
     }

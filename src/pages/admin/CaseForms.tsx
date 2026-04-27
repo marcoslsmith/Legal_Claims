@@ -7,6 +7,13 @@ interface CaseQuestionRow extends CaseQuestion {
   question: Question;
 }
 
+// Collected outside case_questions (shared quiz/profile/submission metadata)
+const GLOBAL_CAPTURED_FIELDS = new Set([
+  'prior_attorney',
+  'prior_attorney_for_case',
+  'experienced_employment_issues',
+]);
+
 export default function CaseForms() {
   const [cases, setCases] = useState<Case[]>([]);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
@@ -85,7 +92,7 @@ export default function CaseForms() {
   const availableToAdd = allQuestions.filter(q => !alreadyAdded.has(q.id));
   const questionFieldKeys = new Set(caseQs.map((cq) => cq.question?.field_key).filter(Boolean));
   const ruleFieldKeys = Array.from(new Set(caseRules.map((r) => r.field_key).filter(Boolean)));
-  const missingRuleFields = ruleFieldKeys.filter((field) => !questionFieldKeys.has(field));
+  const missingRuleFields = ruleFieldKeys.filter((field) => !questionFieldKeys.has(field) && !GLOBAL_CAPTURED_FIELDS.has(field));
   const intakeFieldsNotUsedByRules = Array.from(questionFieldKeys).filter((field) => !ruleFieldKeys.includes(field));
 
   return (
