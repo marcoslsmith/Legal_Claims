@@ -98,9 +98,14 @@ export default function Leads() {
       supabase.from('case_questions').select('questions!case_questions_question_id_fkey(field_key, question_text)').eq('case_id', lead.case_id),
     ]);
 
+    const getCaseQuestion = (cq: any) =>
+      cq['questions!case_questions_question_id_fkey']
+      || cq.questions
+      || null;
+
     const caseFieldKeys = new Set(
       (caseQuestions as any[] || [])
-        .map((cq) => cq['questions!case_questions_question_id_fkey']?.field_key)
+        .map((cq) => getCaseQuestion(cq)?.field_key)
         .filter(Boolean),
     );
 
@@ -128,7 +133,7 @@ export default function Leads() {
       if (a.question?.question_text) labelMap[a.field_key] = a.question.question_text;
     });
     (caseQuestions as any[] || []).forEach((cq) => {
-      const q = cq['questions!case_questions_question_id_fkey'];
+      const q = getCaseQuestion(cq);
       if (q?.field_key && q?.question_text && !labelMap[q.field_key]) {
         labelMap[q.field_key] = q.question_text;
       }
