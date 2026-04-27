@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, X, Trash2, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { DEFAULT_POSSIBLE_MIN, DEFAULT_STRONG_MIN } from '../../lib/matching';
 import type { Case, MatchingRule, Question } from '../../types/database';
 
 const OPERATORS = ['equals', 'not_equals', 'contains', 'in_list', 'greater_than', 'less_than', 'between'];
@@ -106,7 +107,7 @@ export default function Rules() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="font-semibold text-slate-900 text-sm">{selectedCase.name}</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Max score: <strong>{totalPoints} pts</strong> · Strong Match ≥80 pts</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Max score: <strong>{totalPoints} pts</strong> · Strong match (default) ≥{DEFAULT_STRONG_MIN} pts — see platform settings</p>
                 </div>
                 <button
                   onClick={() => { setForm({ ...EMPTY, case_id: selectedCase.id }); setShowForm(true); }}
@@ -119,9 +120,9 @@ export default function Rules() {
               {/* Scoring tiers */}
               <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
                 {[
-                  { label: 'Strong Match', range: '≥80 pts', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-                  { label: 'Possible Match', range: '50–79 pts', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-                  { label: 'More Info', range: '<50 pts', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                  { label: 'Strong Match', range: `≥${DEFAULT_STRONG_MIN} pts`, cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                  { label: 'Possible Match', range: `${DEFAULT_POSSIBLE_MIN}–${DEFAULT_STRONG_MIN - 1} pts`, cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+                  { label: 'More Info', range: `<${DEFAULT_POSSIBLE_MIN} pts`, cls: 'bg-blue-50 text-blue-700 border-blue-200' },
                 ].map(t => (
                   <span key={t.label} className={`text-xs px-2.5 py-1 rounded-full font-medium border shrink-0 ${t.cls}`}>
                     {t.label}: {t.range}

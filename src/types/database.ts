@@ -205,6 +205,25 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['buyer_destinations']['Row'], 'created_at'> & { id?: string };
         Update: Partial<Database['public']['Tables']['buyer_destinations']['Insert']>;
       };
+      platform_settings: {
+        Row: {
+          id: number;
+          strong_match_min: number;
+          possible_match_min: number;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          strong_match_min?: number;
+          possible_match_min?: number;
+        };
+        Update: {
+          id?: number;
+          strong_match_min?: number;
+          possible_match_min?: number;
+          updated_at?: string | null;
+        };
+      };
     };
   };
 }

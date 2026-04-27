@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, RefreshCw, AlertCircle, Search, ChevronRight, DollarSign, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MatchBadge } from '../components/MatchBadge';
-import type { Case, MatchTier } from '../types/database';
+import {
+  DEFAULT_STRONG_MIN,
+  DEFAULT_POSSIBLE_MIN,
+  scoreCaseMatch,
+  tierFromScore,
+} from '../lib/matching';
+import type { Case, MatchTier, MatchingRule, Submission } from '../types/database';
 
 interface CaseMatch {
   case: Case;
@@ -29,15 +35,34 @@ export default function Results() {
   }, [user]);
 
   const computeMatches = async () => {
-    const [{ data: cases }, { data: rules }, { data: userAnswers }, { data: userSubs }] = await Promise.all([
+    const [
+      { data: cases },
+      { data: rules },
+      { data: userAnswers },
+      { data: userSubs },
+    ] = await Promise.all([
       supabase.from('cases').select('*').eq('status', 'active').order('priority_score', { ascending: false }),
       supabase.from('matching_rules').select('*'),
       supabase.from('answers').select('*').eq('user_id', user!.id),
-      supabase.from('submissions').select('case_id, status').eq('user_id', user!.id),
+      supabase.from('submissions').select('id, case_id, status, match_score, match_tier').eq('user_id', user!.id),
     ]);
 
+    const { data: settingsRow } = await supabase
+      .from('platform_settings')
+      .select('strong_match_min, possible_match_min')
+      .eq('id', 1)
+      .maybeSingle();
+
+    const strongMin = settingsRow?.strong_match_min ?? DEFAULT_STRONG_MIN;
+    const possibleMin = settingsRow?.possible_match_min ?? DEFAULT_POSSIBLE_MIN;
+    const thresholds = { strongMatchMin: strongMin, possibleMatchMin: possibleMin };
+
     const map: Record<string, string> = {};
-    for (const sub of (userSubs || [])) map[sub.case_id] = sub.status;
+    const subsByCaseId: Record<string, { id: string; status: string }> = {};
+    for (const sub of (userSubs || []) as Pick<Submission, 'id' | 'case_id' | 'status'>[]) {
+      map[sub.case_id] = sub.status;
+      subsByCaseId[sub.case_id] = { id: sub.id, status: sub.status };
+    }
     setSubmissionMap(map);
 
     if (!cases) { setLoading(false); return; }
@@ -49,42 +74,29 @@ export default function Results() {
       answerMap[a.field_key] = a.answer_values?.length ? a.answer_values : (a.answer_value || '');
     });
 
+    const allRules = (rules || []) as MatchingRule[];
     const caseMatches: CaseMatch[] = cases.map(c => {
-      const caseRules = (rules || []).filter(r => r.case_id === c.id);
-      let score = 0;
-      let disqualified = false;
-
-      for (const rule of caseRules) {
-        const userVal = answerMap[rule.field_key];
-        if (userVal === undefined || userVal === '') continue;
-        const strVal = Array.isArray(userVal) ? userVal.join(',') : userVal;
-
-        let matched = false;
-        switch (rule.operator) {
-          case 'equals': matched = strVal.toLowerCase() === (rule.value || '').toLowerCase(); break;
-          case 'not_equals': matched = strVal.toLowerCase() !== (rule.value || '').toLowerCase(); break;
-          case 'contains': matched = strVal.toLowerCase().includes((rule.value || '').toLowerCase()); break;
-          case 'in_list':
-            matched = Array.isArray(userVal)
-              ? userVal.some(v => (rule.value_list || []).includes(v))
-              : (rule.value_list || []).some(v => strVal.toLowerCase().includes(v.toLowerCase()));
-            break;
-        }
-
-        if (matched) {
-          if (rule.is_disqualifying) { disqualified = true; break; }
-          score += rule.points || 0;
-        }
-      }
-
-      let tier: MatchTier;
-      if (disqualified) tier = 'not_eligible';
-      else if (score >= 80) tier = 'strong_match';
-      else if (score >= 50) tier = 'possible_match';
-      else tier = 'more_info_needed';
-
+      const caseRules = allRules.filter(r => r.case_id === c.id);
+      const { score, disqualified } = scoreCaseMatch(caseRules, answerMap);
+      const tier = tierFromScore(score, disqualified, thresholds);
       return { case: c, tier, score };
     });
+
+    const persistRows = caseMatches
+      .map(m => {
+        const sub = subsByCaseId[m.case.id];
+        if (!sub) return null;
+        return supabase
+          .from('submissions')
+          .update({
+            match_score: m.score,
+            match_tier: m.tier,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', sub.id);
+      })
+      .filter((p): p is NonNullable<typeof p> => p != null);
+    if (persistRows.length) await Promise.all(persistRows);
 
     setMatches(
       caseMatches
@@ -99,10 +111,6 @@ export default function Results() {
       <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
   );
-
-  // Cases that didn't score as a match — show as browse section
-  const matchedIds = new Set(matches.map(m => m.case.id));
-  const otherCases = allCases.filter(c => !matchedIds.has(c.id));
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">

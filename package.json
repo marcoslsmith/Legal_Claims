@@ -8,7 +8,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "supabase:login": "npx supabase@latest login",
+    "supabase:link": "npx supabase@latest link",
+    "supabase:db:push": "npx supabase@latest db push",
+    "supabase:functions:deploy": "npx supabase@latest functions deploy parse-case-document",
+    "supabase:deploy": "npx supabase@latest db push && npx supabase@latest functions deploy parse-case-document"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

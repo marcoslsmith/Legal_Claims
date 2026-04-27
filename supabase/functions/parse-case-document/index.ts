@@ -1,10 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const SYSTEM_PROMPT = `You are a legal intake system configurator. Given a legal case qualification document (1-pager, email, criteria sheet, etc.), extract structured data to configure a legal lead generation platform.
 
@@ -58,31 +53,96 @@ Rules for generating good output:
 - Generate 6-12 questions typically — enough to qualify without overwhelming
 `;
 
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const list = Deno.env.get("ALLOWED_ORIGINS")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  const origin = req.headers.get("Origin");
+  const allow =
+    list.length === 0
+      ? "*"
+      : (origin && list.includes(origin) ? origin : (list[0] ?? "*"));
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
 Deno.serve(async (req: Request) => {
+  const cors = buildCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+    return new Response(null, { status: 204, headers: cors });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return new Response(JSON.stringify({ error: "Server configuration error" }), {
+      status: 500,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!prof?.is_admin) {
+    return new Response(JSON.stringify({ error: "Admin access required" }), {
+      status: 403,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: "OPENAI_API_KEY is not configured. Add it as a Supabase secret." }),
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
+    );
   }
 
   try {
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY is not configured. Add it as a Supabase secret." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const body = await req.json();
     const { document_text, pdf_base64 } = body;
 
     if (!document_text?.trim() && !pdf_base64?.trim()) {
       return new Response(
         JSON.stringify({ error: "document_text or pdf_base64 is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
 
-    // Build the user message — PDF gets sent as a base64 file attachment, text as plain content
     let userMessage: unknown;
     if (pdf_base64) {
       userMessage = {
@@ -126,10 +186,9 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!response.ok) {
-      const err = await response.text();
       return new Response(
-        JSON.stringify({ error: `OpenAI API error: ${err}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "AI provider returned an error. Try again or shorten the document." }),
+        { status: 502, headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
 
@@ -145,20 +204,20 @@ Deno.serve(async (req: Request) => {
         parsed = JSON.parse(match[0]);
       } else {
         return new Response(
-          JSON.stringify({ error: "Failed to parse AI response as JSON", raw: rawText }),
-          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Failed to parse AI response as JSON" }),
+          { status: 422, headers: { ...cors, "Content-Type": "application/json" } },
         );
       }
     }
 
     return new Response(
       JSON.stringify({ result: parsed }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...cors, "Content-Type": "application/json" } },
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: "Request failed" }),
+      { status: 500, headers: { ...cors, "Content-Type": "application/json" } },
     );
   }
 });

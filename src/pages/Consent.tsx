@@ -28,6 +28,7 @@ export default function Consent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [submissionStatus, setSubmissionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
@@ -37,8 +38,11 @@ export default function Consent() {
   const loadSubmission = async () => {
     const { data: caseRow } = await supabase.from('cases').select('id').eq('slug', slug).maybeSingle();
     if (!caseRow) return;
-    const { data: sub } = await supabase.from('submissions').select('*').eq('user_id', user!.id).eq('case_id', caseRow.id).maybeSingle();
-    if (sub) setSubmissionId(sub.id);
+    const { data: sub } = await supabase.from('submissions').select('id, status').eq('user_id', user!.id).eq('case_id', caseRow.id).maybeSingle();
+    if (sub) {
+      setSubmissionId(sub.id);
+      setSubmissionStatus(sub.status);
+    }
   };
 
   const allChecked = CONSENTS.every(c => checks[c.key]);
@@ -48,7 +52,7 @@ export default function Consent() {
     setSubmitting(true);
     setError('');
 
-    await supabase.from('consents').insert({
+    const { error: consentErr } = await supabase.from('consents').insert({
       user_id: user.id,
       submission_id: submissionId,
       consent_contact: checks.consent_contact || false,
@@ -57,20 +61,36 @@ export default function Consent() {
       consent_accuracy: checks.consent_accuracy || false,
       user_agent: navigator.userAgent,
     });
+    if (consentErr) {
+      setError(consentErr.message);
+      setSubmitting(false);
+      return;
+    }
 
-    await supabase.from('submissions').update({
+    const { error: subErr } = await supabase.from('submissions').update({
       status: 'submitted',
       submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', submissionId);
+    if (subErr) {
+      setError(subErr.message);
+      setSubmitting(false);
+      return;
+    }
 
-    // Record status history
-    await supabase.from('lead_status_history').insert({
+    const oldStatus = submissionStatus || 'in_progress';
+    const { error: histErr } = await supabase.from('lead_status_history').insert({
       submission_id: submissionId,
-      old_status: 'in_progress',
+      old_status: oldStatus,
       new_status: 'submitted',
+      changed_by: user.id,
       note: 'Submitted by user',
     });
+    if (histErr) {
+      setError(histErr.message);
+      setSubmitting(false);
+      return;
+    }
 
     setSubmitting(false);
     navigate(`/confirmation/${slug}`);
