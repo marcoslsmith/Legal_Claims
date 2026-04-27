@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Eye, ChevronRight, X, Filter } from 'lucide-react';
+import { Search, Eye, ChevronRight, X, Filter, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { MatchBadge } from '../../components/MatchBadge';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -35,6 +35,7 @@ export default function Leads() {
   const [selected, setSelected] = useState<LeadDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [exportingCase, setExportingCase] = useState<string | null>(null);
 
   useEffect(() => { loadLeads(); }, []);
 
@@ -218,6 +219,94 @@ export default function Leads() {
     }
   };
 
+  const csvEscape = (val: string | number | null | undefined) => {
+    const raw = val == null ? '' : String(val);
+    return `"${raw.replace(/"/g, '""')}"`;
+  };
+
+  const exportCaseCsv = async (caseName: string, caseLeads: Lead[]) => {
+    if (caseLeads.length === 0) return;
+    setExportingCase(caseName);
+    try {
+      const caseId = caseLeads[0].case_id;
+      const userIds = Array.from(new Set(caseLeads.map((l) => l.user_id)));
+
+      const { data: caseQuestions } = await supabase
+        .from('case_questions')
+        .select('questions!case_questions_question_id_fkey(field_key, question_text)')
+        .eq('case_id', caseId);
+
+      const caseFields = (caseQuestions as any[] || [])
+        .map((cq) => cq['questions!case_questions_question_id_fkey'])
+        .filter(Boolean)
+        .map((q: any) => ({ field_key: q.field_key as string, question_text: q.question_text as string }));
+
+      const { data: answers } = await supabase
+        .from('answers')
+        .select('user_id, field_key, answer_value, answer_values')
+        .in('user_id', userIds);
+
+      const answerMapByUser: Record<string, Record<string, string>> = {};
+      (answers || []).forEach((a) => {
+        if (!answerMapByUser[a.user_id]) answerMapByUser[a.user_id] = {};
+        const val = a.answer_values?.length ? a.answer_values.join('; ') : (a.answer_value || '');
+        answerMapByUser[a.user_id][a.field_key] = val;
+      });
+
+      const headers = [
+        'lead_id',
+        'case_name',
+        'status',
+        'match_tier',
+        'match_score',
+        'submitted_at',
+        'full_name',
+        'email',
+        'phone',
+        'state',
+        'prior_attorney_for_case',
+        ...caseFields.map((f) => f.question_text || f.field_key),
+      ];
+
+      const rows = caseLeads.map((lead) => {
+        const userAnswers = answerMapByUser[lead.user_id] || {};
+        const base = [
+          lead.id,
+          caseName,
+          lead.status,
+          lead.match_tier || '',
+          lead.match_score ?? '',
+          lead.submitted_at || '',
+          lead.profile?.full_name || '',
+          lead.profile?.email || '',
+          lead.profile?.phone || '',
+          lead.profile?.state || '',
+          lead.prior_attorney_for_case == null ? '' : (lead.prior_attorney_for_case ? 'yes' : 'no'),
+        ];
+        const caseVals = caseFields.map((f) => userAnswers[f.field_key] || '');
+        return [...base, ...caseVals];
+      });
+
+      const csv = [headers, ...rows]
+        .map((row) => row.map((v) => csvEscape(v as string)).join(','))
+        .join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const safeCase = caseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const dt = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `${safeCase || 'case'}-leads-${dt}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportingCase(null);
+    }
+  };
+
   const updateStatus = async (newStatus: string) => {
     if (!selected) return;
     setUpdatingStatus(true);
@@ -316,9 +405,19 @@ export default function Leads() {
               <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-slate-800 truncate">{caseName}</h2>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-                    {caseLeads.length} lead{caseLeads.length !== 1 ? 's' : ''}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                      {caseLeads.length} lead{caseLeads.length !== 1 ? 's' : ''}
+                    </span>
+                    <button
+                      onClick={() => exportCaseCsv(caseName, caseLeads)}
+                      disabled={exportingCase === caseName}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Download size={13} />
+                      {exportingCase === caseName ? 'Exporting...' : 'Export CSV'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
