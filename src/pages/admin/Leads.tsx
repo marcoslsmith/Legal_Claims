@@ -234,6 +234,14 @@ export default function Leads() {
     return matchesSearch && (!statusFilter || l.status === statusFilter);
   });
 
+  const groupedLeads = filtered.reduce<Record<string, Lead[]>>((acc, lead) => {
+    const key = lead.case?.name || 'Unassigned Case';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(lead);
+    return acc;
+  }, {});
+  const caseGroups = Object.entries(groupedLeads).sort((a, b) => b[1].length - a[1].length);
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
@@ -284,7 +292,7 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Mobile card list */}
+      {/* Lead list grouped by case */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -294,76 +302,87 @@ export default function Leads() {
           {loadError ? `Could not load leads: ${loadError}` : 'No leads found.'}
         </div>
       ) : (
-        <>
-          {/* Desktop table */}
-          <div className="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    {['Name', 'Email', 'Phone', 'State', 'Case', 'Match', 'Status', 'Submitted', ''].map(h => (
-                      <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filtered.map(lead => (
-                    <tr key={lead.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{lead.profile?.full_name || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.profile?.email || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.profile?.phone || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.profile?.state || '—'}</td>
-                      <td className="px-4 py-3 text-slate-700 whitespace-nowrap max-w-[140px] truncate">{lead.case?.name}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{lead.match_tier ? <MatchBadge tier={lead.match_tier as MatchTier} /> : '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={lead.status} /></td>
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap text-xs">{lead.submitted_at ? new Date(lead.submitted_at).toLocaleDateString() : '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => openDetail(lead)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div className="space-y-5">
+          {caseGroups.map(([caseName, caseLeads]) => (
+            <div key={caseName} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-slate-800 truncate">{caseName}</h2>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+                    {caseLeads.length} lead{caseLeads.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
 
-          {/* Mobile / tablet card list */}
-          <div className="lg:hidden space-y-3">
-            {filtered.map(lead => (
-              <button
-                key={lead.id}
-                onClick={() => openDetail(lead)}
-                className="w-full text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-blue-300 active:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900 text-sm truncate">
-                      {lead.profile?.full_name || 'Unknown'}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">{lead.profile?.email}</p>
-                    <p className="text-xs text-slate-600 mt-1 font-medium truncate">{lead.case?.name}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <StatusBadge status={lead.status} />
-                    {lead.match_tier && <MatchBadge tier={lead.match_tier as MatchTier} />}
-                  </div>
+              {/* Desktop table per case */}
+              <div className="hidden lg:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        {['Name', 'Email', 'Phone', 'State', 'Match', 'Status', 'Submitted', ''].map(h => (
+                          <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {caseLeads.map(lead => (
+                        <tr key={lead.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{lead.profile?.full_name || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.profile?.email || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.profile?.phone || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{lead.profile?.state || '—'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">{lead.match_tier ? <MatchBadge tier={lead.match_tier as MatchTier} /> : '—'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap"><StatusBadge status={lead.status} /></td>
+                          <td className="px-4 py-3 text-slate-500 whitespace-nowrap text-xs">{lead.submitted_at ? new Date(lead.submitted_at).toLocaleDateString() : '—'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <button onClick={() => openDetail(lead)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                              <Eye size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span>{lead.profile?.state || '—'}</span>
-                    <span>&bull;</span>
-                    <span>{lead.profile?.phone || 'No phone'}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-blue-600 text-xs font-medium">
-                    View <ChevronRight size={13} />
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
+              </div>
+
+              {/* Mobile / tablet card list per case */}
+              <div className="lg:hidden p-3 space-y-3">
+                {caseLeads.map(lead => (
+                  <button
+                    key={lead.id}
+                    onClick={() => openDetail(lead)}
+                    className="w-full text-left bg-white rounded-xl border border-slate-200 p-4 hover:border-blue-300 active:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 text-sm truncate">
+                          {lead.profile?.full_name || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">{lead.profile?.email}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <StatusBadge status={lead.status} />
+                        {lead.match_tier && <MatchBadge tier={lead.match_tier as MatchTier} />}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span>{lead.profile?.state || '—'}</span>
+                        <span>&bull;</span>
+                        <span>{lead.profile?.phone || 'No phone'}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-blue-600 text-xs font-medium">
+                        View <ChevronRight size={13} />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Lead detail — full screen on mobile, side panel on desktop */}
