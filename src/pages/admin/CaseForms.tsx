@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, X, Trash2, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { Case, Question, CaseQuestion } from '../../types/database';
+import type { Case, Question, CaseQuestion, MatchingRule } from '../../types/database';
 
 interface CaseQuestionRow extends CaseQuestion {
   question: Question;
@@ -20,6 +20,7 @@ export default function CaseForms() {
   const [requiredForCase, setRequiredForCase] = useState(false);
   const [conditionQId, setConditionQId] = useState('');
   const [conditionAnswer, setConditionAnswer] = useState('');
+  const [caseRules, setCaseRules] = useState<MatchingRule[]>([]);
 
   useEffect(() => {
     supabase.from('cases').select('*').eq('status', 'active').order('priority_score', { ascending: false })
@@ -32,12 +33,16 @@ export default function CaseForms() {
     setLoading(true);
     setSelectedCase(c);
     setShowCaseList(false);
-    const { data } = await supabase
-      .from('case_questions')
-      .select('*, questions(*)')
-      .eq('case_id', c.id)
-      .order('display_order');
-    setCaseQs((data as any[] || []).map(cq => ({ ...cq, question: cq.questions })));
+    const [{ data: formData }, { data: ruleData }] = await Promise.all([
+      supabase
+        .from('case_questions')
+        .select('*, questions(*)')
+        .eq('case_id', c.id)
+        .order('display_order'),
+      supabase.from('matching_rules').select('*').eq('case_id', c.id),
+    ]);
+    setCaseQs((formData as any[] || []).map(cq => ({ ...cq, question: cq.questions })));
+    setCaseRules((ruleData as MatchingRule[]) || []);
     setLoading(false);
   };
 
@@ -78,6 +83,10 @@ export default function CaseForms() {
 
   const alreadyAdded = new Set(caseQs.map(cq => cq.question_id));
   const availableToAdd = allQuestions.filter(q => !alreadyAdded.has(q.id));
+  const questionFieldKeys = new Set(caseQs.map((cq) => cq.question?.field_key).filter(Boolean));
+  const ruleFieldKeys = Array.from(new Set(caseRules.map((r) => r.field_key).filter(Boolean)));
+  const missingRuleFields = ruleFieldKeys.filter((field) => !questionFieldKeys.has(field));
+  const intakeFieldsNotUsedByRules = Array.from(questionFieldKeys).filter((field) => !ruleFieldKeys.includes(field));
 
   return (
     <div className="p-4 sm:p-6">
@@ -137,6 +146,39 @@ export default function CaseForms() {
                 >
                   <Plus size={15} /> Add
                 </button>
+              </div>
+
+              <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Intake Coverage Audit</p>
+                {caseRules.length === 0 ? (
+                  <p className="text-xs text-slate-500">No matching rules found for this case yet. Add rules to define qualification requirements.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-slate-700">
+                      Rules: <strong>{caseRules.length}</strong> · Rule fields: <strong>{ruleFieldKeys.length}</strong> · Intake fields: <strong>{questionFieldKeys.size}</strong>
+                    </p>
+                    {missingRuleFields.length > 0 ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                        <p className="text-xs font-semibold text-amber-700 mb-1">Missing in intake form ({missingRuleFields.length})</p>
+                        <p className="text-xs text-amber-800">
+                          These fields are used in matching rules but are not present in this case form: {missingRuleFields.join(', ')}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+                        All rule fields are represented in this intake form.
+                      </p>
+                    )}
+                    {intakeFieldsNotUsedByRules.length > 0 && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+                        <p className="text-xs font-semibold text-blue-700 mb-1">Not used in rules ({intakeFieldsNotUsedByRules.length})</p>
+                        <p className="text-xs text-blue-800">
+                          These intake fields are collected but not used in matching: {intakeFieldsNotUsedByRules.join(', ')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {loading ? (

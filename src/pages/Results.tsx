@@ -16,6 +16,7 @@ interface CaseMatch {
   case: Case;
   tier: MatchTier;
   score: number;
+  missingInfo: Array<{ fieldKey: string; label: string; reason: string }>;
 }
 
 const COMPLETED_STATUSES = new Set(['submitted', 'under_review', 'routed', 'accepted', 'rejected', 'duplicate', 'bad_contact', 'closed']);
@@ -40,11 +41,13 @@ export default function Results() {
       { data: rules },
       { data: userAnswers },
       { data: userSubs },
+      { data: questions },
     ] = await Promise.all([
       supabase.from('cases').select('*').eq('status', 'active').order('priority_score', { ascending: false }),
       supabase.from('matching_rules').select('*'),
       supabase.from('answers').select('*').eq('user_id', user!.id),
       supabase.from('submissions').select('id, case_id, status, match_score, match_tier').eq('user_id', user!.id),
+      supabase.from('questions').select('field_key, question_text'),
     ]);
 
     const { data: settingsRow } = await supabase
@@ -75,11 +78,28 @@ export default function Results() {
     });
 
     const allRules = (rules || []) as MatchingRule[];
+    const questionLabelMap: Record<string, string> = {};
+    (questions || []).forEach((q: { field_key: string; question_text: string }) => {
+      questionLabelMap[q.field_key] = q.question_text;
+    });
+
     const caseMatches: CaseMatch[] = cases.map(c => {
       const caseRules = allRules.filter(r => r.case_id === c.id);
       const { score, disqualified } = scoreCaseMatch(caseRules, answerMap);
       const tier = tierFromScore(score, disqualified, thresholds);
-      return { case: c, tier, score };
+      const missingInfo = caseRules
+        .filter((r) => {
+          const val = answerMap[r.field_key];
+          return val === undefined || val === null || String(val).trim() === '';
+        })
+        .map((r) => ({
+          fieldKey: r.field_key,
+          label: questionLabelMap[r.field_key] || r.field_key,
+          reason: r.description || 'Needed to evaluate eligibility for this case',
+        }))
+        .filter((item, index, arr) => arr.findIndex((x) => x.fieldKey === item.fieldKey) === index);
+
+      return { case: c, tier, score, missingInfo };
     });
 
     const persistRows = caseMatches
@@ -148,6 +168,18 @@ export default function Results() {
                 </div>
               </div>
               <p className="text-sm text-slate-600 leading-relaxed mb-3">{m.case.short_description}</p>
+              {m.tier === 'more_info_needed' && m.missingInfo.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">More info needed to better qualify this case:</p>
+                  <ul className="space-y-1">
+                    {m.missingInfo.slice(0, 4).map((item) => (
+                      <li key={item.fieldKey} className="text-xs text-amber-800">
+                        <strong>{item.label}</strong> - {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {m.case.payout_range && (
                 <div className="flex items-center gap-2 bg-emerald-50 rounded-lg px-3 py-2 mb-4 border border-emerald-100">
                   <DollarSign size={13} className="text-emerald-600 shrink-0" />
@@ -180,7 +212,7 @@ export default function Results() {
                     to={`/intake/${m.case.slug}`}
                     className="flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-3 rounded-xl transition-colors w-full min-h-[48px]"
                   >
-                    Start Intake <ArrowRight size={15} />
+                    {m.tier === 'more_info_needed' ? 'Complete Missing Intake' : 'Start Intake'} <ArrowRight size={15} />
                   </Link>
                 );
               })()}
