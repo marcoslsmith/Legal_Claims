@@ -15,14 +15,14 @@ export function ruleMatchesAnswer(rule: MatchingRule, userVal: string | string[]
 
   switch (rule.operator) {
     case 'equals':
-      return strVal.toLowerCase() === (rule.value || '').toLowerCase();
+      return normalizedEquals(strVal, rule.value || '');
     case 'not_equals':
-      return strVal.toLowerCase() !== (rule.value || '').toLowerCase();
+      return !normalizedEquals(strVal, rule.value || '');
     case 'contains':
       return strVal.toLowerCase().includes((rule.value || '').toLowerCase());
     case 'in_list':
       if (Array.isArray(userVal)) {
-        return userVal.some((v) => (rule.value_list || []).includes(v));
+        return userVal.some((v) => (rule.value_list || []).some((expected) => normalizedEquals(v, expected)));
       }
       return (rule.value_list || []).some((v) => strVal.toLowerCase().includes(v.toLowerCase()));
     case 'greater_than': {
@@ -44,6 +44,21 @@ export function ruleMatchesAnswer(rule: MatchingRule, userVal: string | string[]
     default:
       return false;
   }
+}
+
+function normalizedEquals(actual: string, expected: string): boolean {
+  const boolA = asBoolLike(actual);
+  const boolB = asBoolLike(expected);
+  if (boolA !== null && boolB !== null) return boolA === boolB;
+  return actual.toLowerCase() === expected.toLowerCase();
+}
+
+function asBoolLike(v: string | null | undefined): boolean | null {
+  if (v == null) return null;
+  const s = v.trim().toLowerCase();
+  if (['true', 'yes', 'y', '1'].includes(s)) return true;
+  if (['false', 'no', 'n', '0'].includes(s)) return false;
+  return null;
 }
 
 function numOrDateMs(s: string | null | undefined): number | null {

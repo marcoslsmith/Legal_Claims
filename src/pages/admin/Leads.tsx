@@ -98,7 +98,7 @@ export default function Leads() {
     answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
     // Some qualification fields may live on profile instead of answers.
     if (lead.profile?.prior_attorney != null && !answerMap.prior_attorney) {
-      answerMap.prior_attorney = lead.profile.prior_attorney ? 'yes' : 'no';
+      answerMap.prior_attorney = lead.profile.prior_attorney ? 'true' : 'false';
     }
     if (lead.profile?.state && !answerMap.state) {
       answerMap.state = lead.profile.state;
