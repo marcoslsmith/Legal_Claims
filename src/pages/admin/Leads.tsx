@@ -3,7 +3,8 @@ import { Search, Eye, ChevronRight, X, Filter } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { MatchBadge } from '../../components/MatchBadge';
 import { StatusBadge } from '../../components/StatusBadge';
-import type { Submission, Case, Profile, MatchTier } from '../../types/database';
+import { ruleMatchesAnswer } from '../../lib/matching';
+import type { Submission, Case, Profile, MatchTier, MatchingRule } from '../../types/database';
 
 interface Lead extends Submission {
   case: Case;
@@ -15,6 +16,11 @@ interface LeadDetail extends Lead {
   documents: Array<{ id: string; file_name: string; document_type: string }>;
   consents: Array<{ consented_at: string }>;
   status_history: Array<{ new_status: string; created_at: string; note: string }>;
+  insights: {
+    missing: Array<{ field_key: string; label: string; reason: string }>;
+    positive: Array<{ field_key: string; label: string; points: number; reason: string }>;
+    negative: Array<{ field_key: string; label: string; reason: string }>;
+  };
 }
 
 const STATUSES = ['new', 'needs_review', 'qualified', 'routed', 'accepted', 'rejected', 'duplicate', 'bad_contact', 'closed'];
@@ -78,18 +84,94 @@ export default function Leads() {
   const openDetail = async (lead: Lead) => {
     setDetailLoading(true);
     setSelected(lead as LeadDetail);
-    const [{ data: ans }, { data: docs }, { data: cons }, { data: hist }] = await Promise.all([
+    const [{ data: ans }, { data: docs }, { data: cons }, { data: hist }, { data: rules }, { data: caseQuestions }] = await Promise.all([
       supabase.from('answers').select('*, questions(question_text)').eq('user_id', lead.user_id),
       supabase.from('uploaded_documents').select('*').eq('submission_id', lead.id),
       supabase.from('consents').select('*').eq('submission_id', lead.id),
       supabase.from('lead_status_history').select('*').eq('submission_id', lead.id).order('created_at'),
+      supabase.from('matching_rules').select('*').eq('case_id', lead.case_id),
+      supabase.from('case_questions').select('questions!case_questions_question_id_fkey(field_key, question_text)').eq('case_id', lead.case_id),
     ]);
+
+    const answers = (ans as any[] || []).map(a => ({ ...a, question: a.questions }));
+    const answerMap: Record<string, string> = {};
+    answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
+
+    const labelMap: Record<string, string> = {};
+    (answers || []).forEach((a) => {
+      if (a.question?.question_text) labelMap[a.field_key] = a.question.question_text;
+    });
+    (caseQuestions as any[] || []).forEach((cq) => {
+      const q = cq['questions!case_questions_question_id_fkey'];
+      if (q?.field_key && q?.question_text && !labelMap[q.field_key]) {
+        labelMap[q.field_key] = q.question_text;
+      }
+    });
+
+    const insights: LeadDetail['insights'] = { missing: [], positive: [], negative: [] };
+    ((rules || []) as MatchingRule[]).forEach((rule) => {
+      const rawVal = answerMap[rule.field_key];
+      const label = labelMap[rule.field_key] || rule.field_key;
+      const hasValue = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '';
+
+      if (!hasValue) {
+        insights.missing.push({
+          field_key: rule.field_key,
+          label,
+          reason: rule.description || 'Needed to evaluate eligibility',
+        });
+        return;
+      }
+
+      const matched = ruleMatchesAnswer(rule, rawVal);
+      if (rule.is_disqualifying && matched) {
+        insights.negative.push({
+          field_key: rule.field_key,
+          label,
+          reason: rule.description || 'This answer currently disqualifies the lead',
+        });
+        return;
+      }
+
+      if (!rule.is_disqualifying && matched) {
+        insights.positive.push({
+          field_key: rule.field_key,
+          label,
+          points: rule.points || 0,
+          reason: rule.description || 'This answer supports qualification',
+        });
+        return;
+      }
+
+      if (!rule.is_disqualifying && !matched) {
+        insights.negative.push({
+          field_key: rule.field_key,
+          label,
+          reason: rule.description || 'This answer is not helping this case qualify',
+        });
+      }
+    });
+
+    const dedupeByField = <T extends { field_key: string }>(arr: T[]) => {
+      const seen = new Set<string>();
+      return arr.filter((item) => {
+        const key = item.field_key;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+    insights.missing = dedupeByField(insights.missing);
+    insights.positive = dedupeByField(insights.positive).sort((a, b) => b.points - a.points);
+    insights.negative = dedupeByField(insights.negative);
+
     setSelected({
       ...lead,
-      answers: (ans as any[] || []).map(a => ({ ...a, question: a.questions })),
+      answers,
       documents: docs || [],
       consents: cons || [],
       status_history: hist || [],
+      insights,
     });
     setDetailLoading(false);
   };
@@ -321,6 +403,51 @@ export default function Leads() {
                     <div className="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
                       {selected.match_tier && <MatchBadge tier={selected.match_tier as MatchTier} />}
                       <span className="text-sm text-slate-700">Score: <strong>{selected.match_score || 0} pts</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Eligibility insights */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Eligibility Insights</h3>
+                    <div className="space-y-2">
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                        <div className="text-xs font-semibold text-amber-700 mb-1">Needs More Info ({selected.insights?.missing?.length || 0})</div>
+                        {(selected.insights?.missing?.length || 0) === 0 ? (
+                          <p className="text-xs text-amber-700/80">No rule-based gaps found.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {selected.insights.missing.slice(0, 6).map((m, i) => (
+                              <p key={`${m.field_key}-${i}`} className="text-xs text-amber-800"><strong>{m.label}:</strong> {m.reason}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                        <div className="text-xs font-semibold text-emerald-700 mb-1">Helps Qualification ({selected.insights?.positive?.length || 0})</div>
+                        {(selected.insights?.positive?.length || 0) === 0 ? (
+                          <p className="text-xs text-emerald-700/80">No positive rule matches yet.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {selected.insights.positive.slice(0, 6).map((p, i) => (
+                              <p key={`${p.field_key}-${i}`} className="text-xs text-emerald-800"><strong>{p.label}</strong> (+{p.points}): {p.reason}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-rose-50 border border-rose-200 rounded-xl p-3">
+                        <div className="text-xs font-semibold text-rose-700 mb-1">Lowers Qualification ({selected.insights?.negative?.length || 0})</div>
+                        {(selected.insights?.negative?.length || 0) === 0 ? (
+                          <p className="text-xs text-rose-700/80">No negative rule signals found.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {selected.insights.negative.slice(0, 6).map((n, i) => (
+                              <p key={`${n.field_key}-${i}`} className="text-xs text-rose-800"><strong>{n.label}:</strong> {n.reason}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
