@@ -93,7 +93,15 @@ export default function Leads() {
       supabase.from('case_questions').select('questions!case_questions_question_id_fkey(field_key, question_text)').eq('case_id', lead.case_id),
     ]);
 
-    const answers = (ans as any[] || []).map(a => ({ ...a, question: a.questions }));
+    const caseFieldKeys = new Set(
+      (caseQuestions as any[] || [])
+        .map((cq) => cq['questions!case_questions_question_id_fkey']?.field_key)
+        .filter(Boolean),
+    );
+
+    const answers = (ans as any[] || [])
+      .map(a => ({ ...a, question: a.questions }))
+      .filter((a) => caseFieldKeys.has(a.field_key));
     const answerMap: Record<string, string> = {};
     answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
     // Some qualification fields may live on submission/profile instead of answers.
