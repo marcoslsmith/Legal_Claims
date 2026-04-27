@@ -7,7 +7,7 @@ import type { Submission, Case, Profile, MatchTier } from '../../types/database'
 
 interface Lead extends Submission {
   case: Case;
-  profile: Profile;
+  profile: Profile | null;
 }
 
 interface LeadDetail extends Lead {
@@ -22,6 +22,7 @@ const STATUSES = ['new', 'needs_review', 'qualified', 'routed', 'accepted', 'rej
 export default function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -32,11 +33,45 @@ export default function Leads() {
   useEffect(() => { loadLeads(); }, []);
 
   const loadLeads = async () => {
-    const { data } = await supabase
+    setLoadError('');
+    const { data: subs, error: subsError } = await supabase
       .from('submissions')
-      .select('*, cases(*), profiles(*)')
+      .select('*, cases(*)')
       .order('created_at', { ascending: false });
-    setLeads((data as any[] || []).map(s => ({ ...s, case: s.cases, profile: s.profiles })));
+
+    if (subsError) {
+      setLoadError(subsError.message);
+      setLeads([]);
+      setLoading(false);
+      return;
+    }
+
+    const submissions = (subs as any[] || []);
+    const userIds = Array.from(new Set(submissions.map((s) => s.user_id).filter(Boolean)));
+
+    const profileMap: Record<string, Profile> = {};
+    if (userIds.length > 0) {
+      const { data: profileRows, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds);
+
+      if (profileError) {
+        setLoadError(profileError.message);
+      } else {
+        (profileRows || []).forEach((p) => {
+          profileMap[p.id] = p;
+        });
+      }
+    }
+
+    setLeads(
+      submissions.map((s) => ({
+        ...s,
+        case: s.cases,
+        profile: profileMap[s.user_id] || null,
+      })),
+    );
     setLoading(false);
   };
 
@@ -140,7 +175,7 @@ export default function Leads() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400 text-sm bg-white rounded-xl border border-slate-200">
-          No leads found.
+          {loadError ? `Could not load leads: ${loadError}` : 'No leads found.'}
         </div>
       ) : (
         <>
