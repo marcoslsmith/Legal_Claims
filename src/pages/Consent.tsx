@@ -29,6 +29,7 @@ export default function Consent() {
   const [error, setError] = useState('');
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [submissionStatus, setSubmissionStatus] = useState<string | null>(null);
+  const [priorAttorneyForCase, setPriorAttorneyForCase] = useState<'yes' | 'no' | ''>('');
 
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
@@ -38,10 +39,12 @@ export default function Consent() {
   const loadSubmission = async () => {
     const { data: caseRow } = await supabase.from('cases').select('id').eq('slug', slug).maybeSingle();
     if (!caseRow) return;
-    const { data: sub } = await supabase.from('submissions').select('id, status').eq('user_id', user!.id).eq('case_id', caseRow.id).maybeSingle();
+    const { data: sub } = await supabase.from('submissions').select('id, status, prior_attorney_for_case').eq('user_id', user!.id).eq('case_id', caseRow.id).maybeSingle();
     if (sub) {
       setSubmissionId(sub.id);
       setSubmissionStatus(sub.status);
+      if (sub.prior_attorney_for_case === true) setPriorAttorneyForCase('yes');
+      if (sub.prior_attorney_for_case === false) setPriorAttorneyForCase('no');
     }
   };
 
@@ -49,6 +52,7 @@ export default function Consent() {
 
   const handleSubmit = async () => {
     if (!allChecked || !user || !submissionId) { setError('Please complete all required checkboxes.'); return; }
+    if (!priorAttorneyForCase) { setError('Please tell us whether you currently have an attorney for this specific case.'); return; }
     setSubmitting(true);
     setError('');
 
@@ -69,6 +73,7 @@ export default function Consent() {
 
     const { error: subErr } = await supabase.from('submissions').update({
       status: 'submitted',
+      prior_attorney_for_case: priorAttorneyForCase === 'yes',
       submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', submissionId);
@@ -126,6 +131,37 @@ export default function Consent() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 mb-6">
+        <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <p className="text-sm font-semibold text-slate-800 mb-2">Case-specific attorney check</p>
+          <p className="text-xs text-slate-600 mb-3">
+            Do you currently have an attorney representing you for this specific case?
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPriorAttorneyForCase('yes')}
+              className={`flex-1 min-h-[42px] rounded-xl border text-sm font-medium transition-colors ${
+                priorAttorneyForCase === 'yes'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setPriorAttorneyForCase('no')}
+              className={`flex-1 min-h-[42px] rounded-xl border text-sm font-medium transition-colors ${
+                priorAttorneyForCase === 'no'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'
+              }`}
+            >
+              No
+            </button>
+          </div>
+        </div>
+
         {CONSENTS.map(c => (
           <label key={c.key} className={`flex items-start gap-3 cursor-pointer p-4 rounded-xl transition-colors min-h-[56px] ${checks[c.key] ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}>
             <input type="checkbox" checked={checks[c.key] || false}

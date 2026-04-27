@@ -96,8 +96,10 @@ export default function Leads() {
     const answers = (ans as any[] || []).map(a => ({ ...a, question: a.questions }));
     const answerMap: Record<string, string> = {};
     answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
-    // Some qualification fields may live on profile instead of answers.
-    if (lead.profile?.prior_attorney != null && !answerMap.prior_attorney) {
+    // Some qualification fields may live on submission/profile instead of answers.
+    if (lead.prior_attorney_for_case != null && !answerMap.prior_attorney) {
+      answerMap.prior_attorney = lead.prior_attorney_for_case ? 'true' : 'false';
+    } else if (lead.profile?.prior_attorney != null && !answerMap.prior_attorney) {
       answerMap.prior_attorney = lead.profile.prior_attorney ? 'true' : 'false';
     }
     if (lead.profile?.state && !answerMap.state) {
@@ -417,7 +419,8 @@ export default function Leads() {
                         ['State', selected.profile?.state],
                         ['City', selected.profile?.city],
                         ['ZIP', selected.profile?.zip_code],
-                        ['Prior Attorney', selected.profile?.prior_attorney ? 'Yes' : 'No'],
+                        ['Prior Attorney (This Case)', selected.prior_attorney_for_case == null ? 'Not answered' : (selected.prior_attorney_for_case ? 'Yes' : 'No')],
+                        ['Prior Attorney (Profile)', selected.profile?.prior_attorney ? 'Yes' : 'No'],
                       ].map(([k, v]) => (
                         <div key={k as string} className="bg-slate-50 rounded-xl p-3">
                           <div className="text-xs text-slate-400 mb-0.5">{k}</div>

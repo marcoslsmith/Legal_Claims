@@ -110,6 +110,7 @@ export interface Database {
           user_id: string;
           case_id: string;
           status: string;
+          prior_attorney_for_case: boolean | null;
           match_score: number | null;
           match_tier: string | null;
           source: string | null;
