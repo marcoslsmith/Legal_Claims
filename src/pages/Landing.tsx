@@ -160,7 +160,7 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {compensationExamples.map((c) => (
-              <div key={c.name} className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-200 hover:shadow-md transition-all duration-200 group">
+              <Link key={c.name} to="/browse" className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-blue-200 hover:shadow-md transition-all duration-200 group block">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <h3 className="font-bold text-slate-900 text-sm leading-snug group-hover:text-blue-700 transition-colors">{c.name}</h3>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${c.type === 'Mass Tort' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>{c.type}</span>
@@ -173,7 +173,7 @@ export default function Landing() {
                     <div className="text-sm font-bold text-emerald-800">{c.range}</div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           <div className="text-center mt-10">

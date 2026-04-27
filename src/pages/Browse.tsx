@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Search, DollarSign, Scale, X, SlidersHorizontal, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { Case } from '../types/database';
+import { MatchBadge } from '../components/MatchBadge';
+import type { Case, MatchTier } from '../types/database';
 
 const TYPE_LABELS: Record<string, string> = {
   mass_tort: 'Mass Tort',
@@ -18,6 +19,7 @@ export default function Browse() {
   const { user, loading: authLoading } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [submissionMap, setSubmissionMap] = useState<Record<string, string>>({}); // case_id -> status
+  const [matchTierMap, setMatchTierMap] = useState<Record<string, MatchTier>>({}); // case_id -> match_tier
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -31,17 +33,20 @@ export default function Browse() {
     const [casesRes, subsRes] = await Promise.all([
       supabase.from('cases').select('*').eq('status', 'active').order('priority_score', { ascending: false }),
       user
-        ? supabase.from('submissions').select('case_id, status').eq('user_id', user.id)
+        ? supabase.from('submissions').select('case_id, status, match_tier').eq('user_id', user.id)
         : Promise.resolve({ data: [] }),
     ]);
 
     setCases(casesRes.data || []);
 
     const map: Record<string, string> = {};
-    for (const sub of (subsRes.data || [])) {
+    const tierMap: Record<string, MatchTier> = {};
+    for (const sub of (subsRes.data || []) as any[]) {
       map[sub.case_id] = sub.status;
+      if (sub.match_tier) tierMap[sub.case_id] = sub.match_tier as MatchTier;
     }
     setSubmissionMap(map);
+    setMatchTierMap(tierMap);
     setLoading(false);
   };
 
@@ -148,15 +153,15 @@ export default function Browse() {
                     )}
                   </div>
 
-                  {c.payout_range && (
-                    <div className="flex items-center gap-2 mt-3 bg-emerald-50 rounded-xl px-3 py-2 border border-emerald-100">
-                      <DollarSign size={13} className="text-emerald-600 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-xs text-emerald-600 font-medium">Potential compensation · </span>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {matchTierMap[c.id] && <MatchBadge tier={matchTierMap[c.id]} />}
+                    {c.payout_range && (
+                      <div className="flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2.5 py-1 border border-emerald-100">
+                        <DollarSign size={11} className="text-emerald-600 shrink-0" />
                         <span className="text-xs font-bold text-emerald-800">{c.payout_range}</span>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 <div className={`px-5 py-3 border-t flex items-center justify-between ${isCompleted ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>

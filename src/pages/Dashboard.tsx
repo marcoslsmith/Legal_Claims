@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FileText, ArrowRight, Upload, RefreshCw, AlertCircle, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
+import { FileText, ArrowRight, Upload, RefreshCw, AlertCircle, CheckCircle2, Clock, ChevronRight, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MatchBadge } from '../components/MatchBadge';
@@ -16,6 +16,7 @@ export default function Dashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<DashboardSub[]>([]);
+  const [unexploredCount, setUnexploredCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,17 +25,26 @@ export default function Dashboard() {
   }, [user]);
 
   const loadData = async () => {
-    const { data: subs } = await supabase
-      .from('submissions')
-      .select('*, cases(*), uploaded_documents(*)')
-      .eq('user_id', user!.id)
-      .order('created_at', { ascending: false });
+    const [{ data: subs }, { data: activeCases }] = await Promise.all([
+      supabase
+        .from('submissions')
+        .select('*, cases(*), uploaded_documents(*)')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false }),
+      supabase.from('cases').select('id').eq('status', 'active'),
+    ]);
 
-    setSubmissions((subs as any[] || []).map(s => ({
+    const loadedSubs = (subs as any[] || []).map(s => ({
       ...s,
       case: s.cases,
       documents: s.uploaded_documents || [],
-    })));
+    }));
+    setSubmissions(loadedSubs);
+
+    const touchedIds = new Set(loadedSubs.map(s => s.case_id));
+    const unexplored = (activeCases || []).filter(c => !touchedIds.has(c.id)).length;
+    setUnexploredCount(unexplored);
+
     setLoading(false);
   };
 
@@ -96,6 +106,27 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* Unexplored cases nudge */}
+      {unexploredCount > 0 && (
+        <Link
+          to="/results"
+          className="flex items-center gap-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-2xl p-4 mb-5 transition-all group shadow-sm"
+        >
+          <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+            <Sparkles size={18} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold leading-snug">
+              {unexploredCount} more claim{unexploredCount !== 1 ? 's' : ''} to explore
+            </p>
+            <p className="text-blue-200 text-xs mt-0.5">
+              You may qualify for additional cases you haven't checked yet.
+            </p>
+          </div>
+          <ChevronRight size={18} className="text-blue-200 group-hover:translate-x-0.5 transition-transform shrink-0" />
+        </Link>
+      )}
 
       {/* CTA if no submissions */}
       {submissions.length === 0 ? (

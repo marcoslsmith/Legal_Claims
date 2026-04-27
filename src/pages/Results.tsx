@@ -144,14 +144,83 @@ export default function Results() {
     </div>
   );
 
+  const completedCount = matches.filter(m => {
+    const s = submissionMap[m.case.id];
+    return s && COMPLETED_STATUSES.has(s);
+  }).length;
+  const inProgressCount = matches.filter(m => {
+    const s = submissionMap[m.case.id];
+    return s && IN_PROGRESS_STATUSES.has(s);
+  }).length;
+  const unstarted = matches.filter(m => !submissionMap[m.case.id]).length;
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold text-slate-900 mb-1">Your Matches</h1>
         <p className="text-slate-500 text-sm leading-relaxed">
           Based on your answers, here are the claims you may qualify for.
         </p>
       </div>
+
+      {/* Progress summary strip */}
+      {matches.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="text-center">
+                <div className="text-xl font-bold text-slate-900">{matches.length}</div>
+                <div className="text-xs text-slate-500 font-medium">Potential matches</div>
+              </div>
+              <div className="w-px h-8 bg-blue-200 hidden sm:block" />
+              <div className="text-center">
+                <div className="text-xl font-bold text-emerald-700">{completedCount}</div>
+                <div className="text-xs text-slate-500 font-medium">Submitted</div>
+              </div>
+              {inProgressCount > 0 && (
+                <>
+                  <div className="w-px h-8 bg-blue-200 hidden sm:block" />
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-amber-600">{inProgressCount}</div>
+                    <div className="text-xs text-slate-500 font-medium">In progress</div>
+                  </div>
+                </>
+              )}
+              {unstarted > 0 && (
+                <>
+                  <div className="w-px h-8 bg-blue-200 hidden sm:block" />
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-blue-700">{unstarted}</div>
+                    <div className="text-xs text-slate-500 font-medium">Not started</div>
+                  </div>
+                </>
+              )}
+            </div>
+            {unstarted > 0 && (
+              <p className="text-xs text-blue-700 font-semibold leading-snug max-w-[140px] text-right">
+                {unstarted} claim{unstarted !== 1 ? 's' : ''} still need{unstarted === 1 ? 's' : ''} your intake →
+              </p>
+            )}
+            {unstarted === 0 && completedCount === matches.length && (
+              <p className="text-xs text-emerald-700 font-semibold">All matched claims submitted ✓</p>
+            )}
+          </div>
+          {/* Progress bar */}
+          {matches.length > 0 && (
+            <div className="mt-3">
+              <div className="h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.round((completedCount / matches.length) * 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                {Math.round((completedCount / matches.length) * 100)}% complete
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Matched cases */}
       {matches.length === 0 ? (
