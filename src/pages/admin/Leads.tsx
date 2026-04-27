@@ -12,7 +12,7 @@ interface Lead extends Submission {
 }
 
 interface LeadDetail extends Lead {
-  answers: Array<{ field_key: string; answer_value: string; question?: { question_text: string } }>;
+  answers: Array<{ field_key: string; answer_value: string; answer_values?: string[]; question?: { question_text: string } }>;
   documents: Array<{ id: string; file_name: string; document_type: string }>;
   consents: Array<{ consented_at: string }>;
   status_history: Array<{ new_status: string; created_at: string; note: string }>;
@@ -86,7 +86,11 @@ export default function Leads() {
     setDetailLoading(true);
     setSelected(lead as LeadDetail);
     const [{ data: ans }, { data: docs }, { data: cons }, { data: hist }, { data: rules }, { data: caseQuestions }] = await Promise.all([
-      supabase.from('answers').select('*, questions(question_text)').eq('user_id', lead.user_id),
+      supabase
+        .from('answers')
+        .select('*, questions(question_text)')
+        .eq('user_id', lead.user_id)
+        .or(`submission_id.eq.${lead.id},submission_id.is.null`),
       supabase.from('uploaded_documents').select('*').eq('submission_id', lead.id),
       supabase.from('consents').select('*').eq('submission_id', lead.id),
       supabase.from('lead_status_history').select('*').eq('submission_id', lead.id).order('created_at'),
@@ -103,8 +107,10 @@ export default function Leads() {
     const answers = (ans as any[] || [])
       .map(a => ({ ...a, question: a.questions }))
       .filter((a) => caseFieldKeys.has(a.field_key));
-    const answerMap: Record<string, string> = {};
-    answers.forEach((a) => { answerMap[a.field_key] = a.answer_value || ''; });
+    const answerMap: Record<string, string | string[]> = {};
+    answers.forEach((a) => {
+      answerMap[a.field_key] = a.answer_values?.length ? a.answer_values : (a.answer_value || '');
+    });
     // Some qualification fields may live on submission/profile instead of answers.
     if (lead.prior_attorney_for_case != null) {
       const boolVal = lead.prior_attorney_for_case ? 'true' : 'false';
@@ -132,7 +138,12 @@ export default function Leads() {
     ((rules || []) as MatchingRule[]).forEach((rule) => {
       const rawVal = answerMap[rule.field_key];
       const label = labelMap[rule.field_key] || rule.field_key;
-      const hasValue = rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '';
+      const hasValue = rawVal !== undefined
+        && rawVal !== null
+        && (
+          (Array.isArray(rawVal) && rawVal.length > 0)
+          || (!Array.isArray(rawVal) && String(rawVal).trim() !== '')
+        );
 
       if (!hasValue) {
         insights.missing.push({
@@ -165,7 +176,7 @@ export default function Leads() {
 
       if (!rule.is_disqualifying && !matched) {
         const expected = describeExpected(rule);
-        const got = String(rawVal);
+        const got = Array.isArray(rawVal) ? rawVal.join(', ') : String(rawVal);
         insights.negative.push({
           field_key: rule.field_key,
           label,
@@ -620,7 +631,9 @@ export default function Leads() {
                         {selected.answers.map(a => (
                           <div key={a.field_key} className="bg-slate-50 rounded-xl p-3">
                             <div className="text-xs text-slate-400 mb-0.5">{(a as any).question?.question_text || a.field_key}</div>
-                            <div className="font-medium text-slate-800 text-sm">{a.answer_value || '—'}</div>
+                            <div className="font-medium text-slate-800 text-sm">
+                              {a.answer_values?.length ? a.answer_values.join(', ') : (a.answer_value || '—')}
+                            </div>
                           </div>
                         ))}
                       </div>
