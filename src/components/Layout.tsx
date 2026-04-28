@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Scale, X, LogOut, User, LayoutDashboard, Shield, Search, Home, FileText, Menu, Layers } from 'lucide-react';
+import { Scale, X, LogOut, User, Shield, Search, Home, FileText, Menu, Layers } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const BOTTOM_TABS = [
@@ -15,6 +15,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      requestAnimationFrame(() => {
+        const currentY = window.scrollY;
+        const delta = currentY - lastScrollY.current;
+
+        if (currentY < 60) {
+          // Always show near the top
+          setHeaderVisible(true);
+        } else if (delta > 6) {
+          // Scrolling down — hide header, close mobile menu
+          setHeaderVisible(false);
+          setMenuOpen(false);
+        } else if (delta < -6) {
+          // Scrolling up — reveal header
+          setHeaderVisible(true);
+        }
+
+        lastScrollY.current = currentY;
+        ticking.current = false;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -29,8 +61,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
+      {/* Header — slides up on downscroll, back in on upscroll */}
+      <header className={`bg-white border-b border-slate-200 sticky top-0 z-40 transition-transform duration-300 ease-in-out ${headerVisible ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-blue-700 rounded-lg flex items-center justify-center group-hover:bg-blue-800 transition-colors">

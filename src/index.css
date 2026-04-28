@@ -6,8 +6,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Prevent horizontal scroll on mobile */
+    /* Prevent horizontal scroll / viewport-widening on mobile */
     overflow-x: hidden;
+    max-width: 100%;
   }
   body {
     @apply text-slate-900;
@@ -16,6 +17,9 @@
     -webkit-text-size-adjust: 100%;
     /* Better touch behavior */
     touch-action: manipulation;
+    /* Hard stop — nothing wider than the viewport */
+    overflow-x: hidden;
+    max-width: 100vw;
   }
   /* Prevent iOS Safari from auto-zooming into form inputs.
      iOS zooms when focused font-size < 16px; this sets a floor without

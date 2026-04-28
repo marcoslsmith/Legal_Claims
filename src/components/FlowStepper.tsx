@@ -29,7 +29,7 @@ export function FlowStepper({ steps, currentStep }: FlowStepperProps) {
                 }`}>
                   {done ? <Check size={13} strokeWidth={3} /> : <span>{idx + 1}</span>}
                 </div>
-                <span className={`text-xs mt-1 font-medium whitespace-nowrap transition-colors ${
+                <span className={`text-[9px] sm:text-[10px] mt-1 font-medium text-center leading-tight max-w-[44px] sm:max-w-none transition-colors ${
                   active ? 'text-blue-700' : done ? 'text-emerald-600' : 'text-slate-400'
                 }`}>
                   {step.label}
