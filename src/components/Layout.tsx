@@ -16,6 +16,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [tabBarMinimized, setTabBarMinimized] = useState(false);
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
 
@@ -28,15 +29,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
         const delta = currentY - lastScrollY.current;
 
         if (currentY < 60) {
-          // Always show near the top
           setHeaderVisible(true);
+          setTabBarMinimized(false);
         } else if (delta > 6) {
-          // Scrolling down — hide header, close mobile menu
+          // Scrolling down
           setHeaderVisible(false);
+          setTabBarMinimized(true);
           setMenuOpen(false);
         } else if (delta < -6) {
-          // Scrolling up — reveal header
+          // Scrolling up
           setHeaderVisible(true);
+          setTabBarMinimized(false);
         }
 
         lastScrollY.current = currentY;
@@ -169,31 +172,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </footer>
 
       {/* Mobile bottom tab bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 safe-area-bottom">
-        <div className="grid grid-cols-4 h-16">
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 safe-area-bottom transition-all duration-300 ease-in-out
+        ${tabBarMinimized
+          ? 'bg-white/80 backdrop-blur-md border-t border-white/40 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] rounded-t-2xl'
+          : 'bg-white border-t border-slate-200'
+        }`}>
+        {/* Drag-handle pill — visible only when minimized */}
+        <div className={`flex justify-center pt-1.5 transition-all duration-300 overflow-hidden
+          ${tabBarMinimized ? 'max-h-4 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="w-8 h-1 bg-slate-300 rounded-full" />
+        </div>
+
+        <div className={`grid grid-cols-4 transition-all duration-300 ease-in-out
+          ${tabBarMinimized ? 'h-11' : 'h-16'}`}>
           {BOTTOM_TABS.map(tab => {
             const active = isTabActive(tab.to);
-            const needsAuth = tab.to !== '/';
-            if (needsAuth && !user) {
-              return (
-                <Link
-                  key={tab.to}
-                  to="/auth"
-                  className={`flex flex-col items-center justify-center gap-1 transition-colors ${active ? 'text-blue-700' : 'text-slate-400'}`}
-                >
-                  <tab.icon size={22} strokeWidth={active ? 2.5 : 1.8} />
-                  <span className="text-[10px] font-medium">{tab.label}</span>
-                </Link>
-              );
-            }
+            const href = tab.to !== '/' && !user ? '/auth' : tab.to;
             return (
               <Link
                 key={tab.to}
-                to={tab.to}
-                className={`flex flex-col items-center justify-center gap-1 transition-colors active:scale-95 ${active ? 'text-blue-700' : 'text-slate-400 hover:text-slate-600'}`}
+                to={href}
+                onClick={() => setTabBarMinimized(false)}
+                className={`flex flex-col items-center justify-center transition-colors active:scale-95
+                  ${active ? 'text-blue-700' : 'text-slate-400 hover:text-slate-600'}`}
               >
-                <tab.icon size={22} strokeWidth={active ? 2.5 : 1.8} />
-                <span className={`text-[10px] font-medium ${active ? 'text-blue-700' : ''}`}>{tab.label}</span>
+                <tab.icon
+                  size={tabBarMinimized ? 20 : 22}
+                  strokeWidth={active ? 2.5 : 1.8}
+                  className="transition-all duration-300"
+                />
+                {/* Label fades and collapses when minimized */}
+                <span className={`text-[10px] font-medium leading-none transition-all duration-300 overflow-hidden
+                  ${active ? 'text-blue-700' : ''}
+                  ${tabBarMinimized ? 'max-h-0 opacity-0 mt-0' : 'max-h-4 opacity-100 mt-1'}`}>
+                  {tab.label}
+                </span>
               </Link>
             );
           })}
