@@ -15,16 +15,18 @@ const FLOW_STEPS = [
   { label: 'Done' },
 ];
 
+// Order matters: high-payout signals first to drive engagement.
 const BROAD_QUIZ_KEYS = [
+  'serious_diagnoses',
+  'products_or_meds_used',
+  'surgeries_implants',
+  'toxic_exposure_setting',
+  'family_youth_harm',
+  'recent_consumer_legal_events',
   'state_of_residence',
-  'used_prescription_medications',
-  'used_lawsuit_products',
-  'diagnosed_serious_condition',
-  'military_or_contaminated_site',
-  'received_data_breach_notice',
-  'experienced_employment_issues',
-  'experienced_consumer_issues',
 ];
+
+const NONE_OPTION_REGEX = /^None of these( — continue)?$/i;
 
 type Mode = 'loading' | 'review' | 'quiz';
 
@@ -54,16 +56,44 @@ export default function Quiz() {
     setQuestions(ordered);
 
     const answerMap: Record<string, string> = {};
-    (existingAns || []).forEach(a => { answerMap[a.field_key] = a.answer_value || ''; });
+    (existingAns || []).forEach(a => {
+      answerMap[a.field_key] = a.answer_values?.length
+        ? a.answer_values.join(',')
+        : (a.answer_value || '');
+    });
     setAnswers(answerMap);
 
     const allAnswered = ordered.length > 0 && ordered.every(q => answerMap[q.field_key]);
     setMode(allAnswered ? 'review' : 'quiz');
   };
 
+  const currentQ = questions[step];
+  const currentAnswer = currentQ ? (answers[currentQ.field_key] || '') : '';
+  const optionsArr: string[] = currentQ && Array.isArray(currentQ.answer_options)
+    ? (currentQ.answer_options as string[])
+    : [];
+  const selectedMulti = currentAnswer ? currentAnswer.split(',').filter(Boolean) : [];
+
   const handleAnswer = (value: string) => {
-    if (!questions[step]) return;
-    setAnswers(prev => ({ ...prev, [questions[step].field_key]: value }));
+    if (!currentQ) return;
+    setAnswers(prev => ({ ...prev, [currentQ.field_key]: value }));
+  };
+
+  const handleMultiSelect = (option: string) => {
+    if (!currentQ) return;
+    const isNone = NONE_OPTION_REGEX.test(option);
+    let next: string[];
+    if (isNone) {
+      // Selecting "None of these" clears everything else and toggles itself.
+      next = selectedMulti.includes(option) ? [] : [option];
+    } else {
+      // Picking any real option deselects "None of these".
+      const without = selectedMulti.filter(s => !NONE_OPTION_REGEX.test(s));
+      next = without.includes(option)
+        ? without.filter(s => s !== option)
+        : [...without, option];
+    }
+    setAnswers(prev => ({ ...prev, [currentQ.field_key]: next.join(',') }));
   };
 
   const handleNext = () => {
@@ -79,11 +109,14 @@ export default function Quiz() {
     for (const [fieldKey, value] of Object.entries(answers)) {
       const q = questions.find(q => q.field_key === fieldKey);
       if (!q) continue;
+      const isMulti = q.question_type === 'multi_select';
+      const arr = isMulti ? value.split(',').filter(Boolean) : null;
       await supabase.from('answers').upsert({
         user_id: user.id,
         question_id: q.id,
         field_key: fieldKey,
-        answer_value: value,
+        answer_value: isMulti ? null : value,
+        answer_values: arr,
       }, { onConflict: 'user_id,question_id' });
     }
     if (answers['state_of_residence']) {
@@ -104,7 +137,7 @@ export default function Quiz() {
     </div>
   );
 
-  // Review mode — show all answers with edit options
+  // ===== Review mode: show all answers, allow editing =====
   if (mode === 'review') {
     return (
       <div className="min-h-[calc(100vh-56px)] bg-slate-50 flex flex-col">
@@ -121,13 +154,16 @@ export default function Quiz() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-4">
             {questions.map((q, idx) => {
               const val = answers[q.field_key];
+              const display = q.question_type === 'multi_select'
+                ? (val ? val.split(',').filter(Boolean).join(', ') : '')
+                : val;
               return (
                 <div key={q.id} className={`px-5 py-4 flex items-start gap-3 ${idx < questions.length - 1 ? 'border-b border-slate-100' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-slate-400 font-medium mb-0.5">Q{idx + 1}</p>
                     <p className="text-sm text-slate-700 leading-snug">{q.question_text}</p>
-                    {val ? (
-                      <p className="text-sm font-semibold text-slate-900 mt-1 capitalize">{val}</p>
+                    {display ? (
+                      <p className="text-sm font-semibold text-slate-900 mt-1 leading-snug">{display}</p>
                     ) : (
                       <p className="text-sm text-amber-600 mt-1 font-medium">Not answered</p>
                     )}
@@ -167,11 +203,10 @@ export default function Quiz() {
     );
   }
 
-  // Quiz mode
-  const q = questions[step];
-  if (!q) return null;
-  const currentAnswer = answers[q.field_key] || '';
-  const optionsArr: string[] = Array.isArray(q.answer_options) ? q.answer_options as string[] : [];
+  // ===== Quiz mode =====
+  if (!currentQ) return null;
+  const isMulti = currentQ.question_type === 'multi_select';
+  const canAdvance = isMulti ? selectedMulti.length > 0 : Boolean(currentAnswer);
 
   return (
     <div className="min-h-[calc(100vh-56px)] bg-slate-50 flex flex-col">
@@ -186,14 +221,14 @@ export default function Quiz() {
             <p className="text-xs text-blue-600 font-semibold uppercase tracking-wider mb-2">
               Question {step + 1} of {questions.length}
             </p>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">{q.question_text}</h2>
-            {q.help_text && (
-              <p className="text-sm text-slate-500 mt-2 leading-relaxed">{q.help_text}</p>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">{currentQ.question_text}</h2>
+            {currentQ.help_text && (
+              <p className="text-sm text-slate-500 mt-2 leading-relaxed">{currentQ.help_text}</p>
             )}
           </div>
 
           <div className="flex-1 px-6 py-5 overflow-y-auto">
-            {q.question_type === 'yes_no' && (
+            {currentQ.question_type === 'yes_no' && (
               <div className="space-y-3">
                 {[
                   { value: 'yes', label: 'Yes', desc: 'This applies to me' },
@@ -222,7 +257,7 @@ export default function Quiz() {
               </div>
             )}
 
-            {q.question_type === 'dropdown' && (
+            {currentQ.question_type === 'dropdown' && (
               <div className="space-y-2">
                 {optionsArr.map((opt: string) => (
                   <button
@@ -239,6 +274,46 @@ export default function Quiz() {
                 ))}
               </div>
             )}
+
+            {currentQ.question_type === 'multi_select' && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400 px-1 mb-1">Select anything that may apply — even if you're not sure.</p>
+                {optionsArr.map(opt => {
+                  const isNone = NONE_OPTION_REGEX.test(opt);
+                  const checked = selectedMulti.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => handleMultiSelect(opt)}
+                      className={`w-full text-left px-5 py-3.5 rounded-xl border-2 transition-all duration-150 min-h-[52px] flex items-center gap-3 ${
+                        checked
+                          ? (isNone ? 'border-slate-400 bg-slate-50' : 'border-blue-600 bg-blue-50')
+                          : 'border-slate-200 hover:border-blue-200 hover:bg-slate-50 active:bg-slate-100'
+                      } ${isNone ? 'mt-3 border-dashed' : ''}`}
+                    >
+                      <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        checked
+                          ? (isNone ? 'border-slate-500 bg-slate-500' : 'border-blue-600 bg-blue-600')
+                          : 'border-slate-300'
+                      }`}>
+                        {checked && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={`text-sm ${checked ? 'font-semibold' : 'font-medium'} ${
+                        checked
+                          ? (isNone ? 'text-slate-700' : 'text-blue-700')
+                          : 'text-slate-700'
+                      }`}>
+                        {opt}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="px-6 py-4 border-t border-slate-100 flex items-center gap-3">
@@ -251,7 +326,7 @@ export default function Quiz() {
             </button>
             <button
               onClick={handleNext}
-              disabled={!currentAnswer || saving}
+              disabled={!canAdvance || saving}
               className="flex-1 flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-colors text-sm min-h-[48px]"
             >
               {saving ? (

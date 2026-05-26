@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, RefreshCw, AlertCircle, Search, ChevronRight, DollarSign, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowRight, RefreshCw, AlertCircle, Search, ChevronRight, DollarSign, CheckCircle2, Clock, Sparkles, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MatchBadge } from '../components/MatchBadge';
@@ -10,6 +10,7 @@ import {
   scoreCaseMatch,
   tierFromScore,
 } from '../lib/matching';
+import { suggestedSlugsFromQuiz } from '../lib/quizHints';
 import type { Case, MatchTier, MatchingRule, Submission } from '../types/database';
 
 interface CaseMatch {
@@ -28,6 +29,7 @@ export default function Results() {
   const [matches, setMatches] = useState<CaseMatch[]>([]);
   const [allCases, setAllCases] = useState<Case[]>([]);
   const [submissionMap, setSubmissionMap] = useState<Record<string, string>>({});
+  const [suggestedCases, setSuggestedCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -130,11 +132,21 @@ export default function Results() {
       .filter((p): p is NonNullable<typeof p> => p != null);
     if (persistRows.length) await Promise.all(persistRows);
 
-    setMatches(
-      caseMatches
-        .filter(m => m.tier !== 'not_eligible')
-        .sort((a, b) => b.score - a.score)
+    const sortedMatches = caseMatches
+      .filter(m => m.tier !== 'not_eligible')
+      .sort((a, b) => b.score - a.score);
+    setMatches(sortedMatches);
+
+    // Discovery layer: derive suggested cases from broad-quiz answers.
+    // Excludes cases already in hard matches and ones the user already touched.
+    const matchedIds = new Set(sortedMatches.map(m => m.case.id));
+    const submittedIds = new Set(Object.keys(map));
+    const suggestedSlugs = suggestedSlugsFromQuiz(answerMap);
+    const suggested = (cases || []).filter(
+      c => suggestedSlugs.has(c.slug) && !matchedIds.has(c.id) && !submittedIds.has(c.id),
     );
+    setSuggestedCases(suggested);
+
     setLoading(false);
   };
 
@@ -224,13 +236,18 @@ export default function Results() {
 
       {/* Matched cases */}
       {matches.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center mb-6">
-          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Search size={24} className="text-slate-400" />
+        <div className="bg-gradient-to-br from-blue-50 to-white rounded-2xl border border-blue-200 p-6 text-center mb-6">
+          <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Search size={24} className="text-blue-600" />
           </div>
-          <h2 className="font-semibold text-slate-700 mb-2">No strong matches found</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Based on your answers, we didn't find active claims that match. Browse all open cases below — you may still qualify.
+          <h2 className="font-bold text-slate-900 mb-2">No instant matches yet — but don't stop here</h2>
+          <p className="text-slate-600 text-sm leading-relaxed mb-2">
+            Our quick quiz can only see surface-level signals. Many people who don't initially match still <strong>qualify</strong> once they complete a case-specific intake.
+          </p>
+          <p className="text-slate-600 text-sm leading-relaxed">
+            {suggestedCases.length > 0
+              ? `Based on what you told us, we've highlighted ${suggestedCases.length} ${suggestedCases.length === 1 ? 'case' : 'cases'} below worth a closer look.`
+              : `Browse the full list of active claims below — eligibility often surprises people.`}
           </p>
         </div>
       ) : (
@@ -299,6 +316,51 @@ export default function Results() {
               })()}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Recommended based on quiz answers (discovery layer) */}
+      {suggestedCases.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-start gap-2 mb-1">
+            <Sparkles size={16} className="text-amber-500 mt-1 shrink-0" />
+            <div>
+              <h2 className="font-bold text-slate-900 text-base">Recommended Based on Your Answers</h2>
+              <p className="text-xs text-slate-500 leading-relaxed mt-0.5">
+                Your quiz answers suggest these cases are worth a closer look. Each takes about 2 minutes to check.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2 mt-3">
+            {suggestedCases.map(c => (
+              <Link
+                key={c.id}
+                to={`/intake/${c.slug}`}
+                className="flex items-center gap-3 bg-amber-50/50 hover:bg-amber-50 rounded-xl border border-amber-200 hover:border-amber-300 p-4 transition-all group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <p className="font-semibold text-sm text-slate-900 group-hover:text-amber-900 transition-colors">{c.name}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${c.case_type === 'mass_tort' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>
+                      {c.case_type === 'mass_tort' ? 'Mass Tort' : 'Class Action'}
+                    </span>
+                    {c.category && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-slate-100 text-slate-600 flex items-center gap-1">
+                        <Tag size={9} /> {c.category}
+                      </span>
+                    )}
+                  </div>
+                  {c.short_description && (
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{c.short_description}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-xs font-semibold text-amber-700 hidden sm:inline">Check eligibility</span>
+                  <ArrowRight size={15} className="text-amber-600 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
