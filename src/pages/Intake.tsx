@@ -184,7 +184,24 @@ export default function Intake() {
   const isAlreadyAnswered = !!existingAnswers[q.field_key];
   const optionsArr: string[] = Array.isArray(q.answer_options) ? q.answer_options as string[] : [];
   const selectedMulti = currentVal ? currentVal.split(',') : [];
-  const canAdvance = currentVal || q.question_type === 'multi_select' || q.question_type === 'text' || q.question_type === 'number' || q.question_type === 'date';
+
+  // date_range stores as "YYYY-MM-DD|YYYY-MM-DD"
+  const [dateRangeStart, dateRangeEnd] = q.question_type === 'date_range' && currentVal.includes('|')
+    ? currentVal.split('|')
+    : ['', ''];
+  const handleDateRangeChange = (which: 'start' | 'end', val: string) => {
+    const [s, e] = currentVal.includes('|') ? currentVal.split('|') : ['', ''];
+    const next = which === 'start' ? `${val}|${e}` : `${s}|${val}`;
+    handleAnswer(next);
+  };
+
+  const canAdvance =
+    currentVal ||
+    q.question_type === 'multi_select' ||
+    q.question_type === 'text' ||
+    q.question_type === 'number' ||
+    q.question_type === 'date' ||
+    q.question_type === 'date_range';
 
   return (
     <div className="min-h-[calc(100vh-56px)] bg-slate-50 flex flex-col">
@@ -316,6 +333,30 @@ export default function Intake() {
                 onChange={e => handleAnswer(e.target.value)}
                 className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            )}
+
+            {q.question_type === 'date_range' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">From (approx.)</label>
+                  <input
+                    type="date"
+                    value={dateRangeStart}
+                    onChange={e => handleDateRangeChange('start', e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">To (approx., or leave blank if ongoing)</label>
+                  <input
+                    type="date"
+                    value={dateRangeEnd}
+                    onChange={e => handleDateRangeChange('end', e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <p className="text-xs text-slate-400">A best-guess range is fine — exact dates are not required.</p>
+              </div>
             )}
           </div>
 

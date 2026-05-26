@@ -134,6 +134,11 @@ export default function Browse() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${c.case_type === 'mass_tort' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>
                           {TYPE_LABELS[c.case_type] ?? c.case_type}
                         </span>
+                        {c.category && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 bg-slate-100 text-slate-600">
+                            {c.category}
+                          </span>
+                        )}
                       </div>
                       {c.short_description && (
                         <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">{c.short_description}</p>

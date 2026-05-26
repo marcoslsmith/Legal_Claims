@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, X, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Case } from '../../types/database';
-import { DocRequirementsFields, DOC_TYPE_OPTIONS } from './DocRequirementsFields';
+import { DocRequirementsFields } from './DocRequirementsFields';
 
 const EMPTY: Partial<Case> = {
   name: '', slug: '', case_type: 'mass_tort', status: 'active',
@@ -82,6 +82,16 @@ export default function Cases() {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.case_type === 'mass_tort' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>
                       {c.case_type === 'mass_tort' ? 'Mass Tort' : 'Class Action'}
                     </span>
+                    {c.category && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">
+                        {c.category}
+                      </span>
+                    )}
+                    {c.is_research_grade && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                        <AlertTriangle size={11} /> Research-grade
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[c.status] || 'bg-slate-100 text-slate-600'}`}>
@@ -198,6 +208,31 @@ export default function Cases() {
                   min={0}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Category <span className="text-slate-400 font-normal">(e.g. "Prescription drug", "Data breach")</span>
+                </label>
+                <input
+                  value={form.category || ''}
+                  onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Prescription drug"
+                />
+              </div>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_research_grade ?? false}
+                  onChange={e => setForm(f => ({ ...f, is_research_grade: e.target.checked }))}
+                  className="mt-0.5 w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Research-grade (pending attorney review)</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Case info has not been reviewed by counsel. A warning banner will display in the admin detail.</p>
+                </div>
+              </label>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Short Description</label>

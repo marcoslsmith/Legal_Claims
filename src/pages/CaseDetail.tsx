@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, FileText, ArrowRight, Upload, MapPin, Calendar,
   CheckCircle2, AlertCircle, Clock, Loader2, ChevronRight, DollarSign,
+  Tag, ExternalLink, Shield,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -92,6 +93,11 @@ export default function CaseDetail() {
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${caseData.case_type === 'mass_tort' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>
                 {caseData.case_type === 'mass_tort' ? 'Mass Tort' : 'Class Action'}
               </span>
+              {caseData.category && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-slate-100 text-slate-700 flex items-center gap-1">
+                  <Tag size={10} /> {caseData.category}
+                </span>
+              )}
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                 isActive ? 'bg-emerald-100 text-emerald-700' :
                 caseData.status === 'paused' ? 'bg-amber-100 text-amber-700' :
@@ -175,8 +181,8 @@ export default function CaseDetail() {
         )}
       </div>
 
-      {/* Payout range */}
-      {caseData.payout_range && (
+      {/* Payout — prefer numeric range, fall back to descriptive language */}
+      {caseData.payout_range ? (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-4">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={16} className="text-emerald-600 shrink-0" />
@@ -186,6 +192,24 @@ export default function CaseDetail() {
           <p className="text-xs text-emerald-700 leading-relaxed">
             Potential compensation may vary significantly based on your specific facts, medical history, and legal review. These figures are not a guarantee of recovery.
           </p>
+        </div>
+      ) : caseData.payout_language ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign size={16} className="text-emerald-600 shrink-0" />
+            <h2 className="font-semibold text-emerald-900 text-sm">About Potential Compensation</h2>
+          </div>
+          <p className="text-sm text-emerald-800 leading-relaxed">{caseData.payout_language}</p>
+        </div>
+      ) : null}
+
+      {/* What may qualify (admin-curated) */}
+      {caseData.core_qualifications && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-4">
+          <h2 className="font-semibold text-slate-900 text-sm mb-2 flex items-center gap-2">
+            <CheckCircle2 size={15} className="text-emerald-500" /> What May Qualify
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">{caseData.core_qualifications}</p>
         </div>
       )}
 
@@ -269,6 +293,32 @@ export default function CaseDetail() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Public source references for transparency */}
+      {(caseData.source_urls?.length ?? 0) > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-4">
+          <h2 className="font-semibold text-slate-900 text-sm mb-2 flex items-center gap-2">
+            <Shield size={15} className="text-slate-400" /> Public References
+          </h2>
+          <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+            We only summarize public reporting and court records. Click any link to view the original source.
+          </p>
+          <ul className="space-y-1.5">
+            {caseData.source_urls!.map(url => (
+              <li key={url}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-700 hover:text-blue-800 hover:underline break-all flex items-start gap-1.5"
+                >
+                  <ExternalLink size={11} className="shrink-0 mt-0.5" /> {url}
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

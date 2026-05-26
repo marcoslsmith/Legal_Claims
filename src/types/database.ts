@@ -48,6 +48,17 @@ export interface Database {
           require_medical_docs: boolean;
           required_doc_types: string[];
           internal_notes: string | null;
+          // --- Added 2026-05-25 for research-grade seed cases ---
+          category: string | null;
+          payout_language: string | null;
+          core_qualifications: string | null;
+          disqualifiers_summary: string | null;
+          likely_documents: string | null;
+          deadline_or_timing: string | null;
+          source_urls: string[] | null;
+          admin_review_notes: string | null;
+          confidence_label: string | null;
+          is_research_grade: boolean | null;
           created_at: string | null;
           updated_at: string | null;
         };

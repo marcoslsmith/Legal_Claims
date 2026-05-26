@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, X, Users, FileText, CheckCircle2,
   AlertTriangle, BarChart2, DollarSign, MapPin, Calendar,
-  Shield, HelpCircle, GitBranch, Loader2, Plus,
+  Shield, HelpCircle, GitBranch, Loader2, Plus, ExternalLink, Tag,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Case, Question, MatchingRule } from '../../types/database';
@@ -129,10 +129,15 @@ export default function AdminCaseDetail() {
               {caseData.status}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
             <span className={`px-2 py-0.5 rounded-full font-medium ${caseData.case_type === 'mass_tort' ? 'bg-blue-100 text-blue-700' : 'bg-teal-100 text-teal-700'}`}>
               {caseData.case_type === 'mass_tort' ? 'Mass Tort' : 'Class Action'}
             </span>
+            {caseData.category && (
+              <span className="px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-700 flex items-center gap-1">
+                <Tag size={10} /> {caseData.category}
+              </span>
+            )}
             <span className="font-mono">/{caseData.slug}</span>
           </div>
         </div>
@@ -153,6 +158,84 @@ export default function AdminCaseDetail() {
       </div>
 
       <div className="space-y-4">
+        {/* Research-grade banner */}
+        {caseData.is_research_grade && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-amber-900">Research-grade — pending attorney review</p>
+              <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                {caseData.admin_review_notes || 'Eligibility logic compiled from public sources. Have counsel review intake criteria, payout language, and source URLs before fully publishing or routing leads.'}
+              </p>
+              {caseData.confidence_label && (
+                <p className="text-xs text-amber-700 mt-1.5 font-medium">Source confidence: {caseData.confidence_label}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Eligibility intake criteria (read-only summary from spreadsheet seed) */}
+        {(caseData.core_qualifications || caseData.disqualifiers_summary || caseData.likely_documents || caseData.deadline_or_timing || caseData.payout_language) && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+            <h2 className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+              <FileText size={15} className="text-slate-400" /> Intake Criteria & Guidance
+            </h2>
+            {caseData.core_qualifications && (
+              <div>
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Core Qualifications</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{caseData.core_qualifications}</p>
+              </div>
+            )}
+            {caseData.disqualifiers_summary && (
+              <div>
+                <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Disqualifiers</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{caseData.disqualifiers_summary}</p>
+              </div>
+            )}
+            {caseData.likely_documents && (
+              <div>
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Likely Documents</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{caseData.likely_documents}</p>
+              </div>
+            )}
+            {caseData.deadline_or_timing && (
+              <div>
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Deadline / Timing</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{caseData.deadline_or_timing}</p>
+              </div>
+            )}
+            {caseData.payout_language && (
+              <div>
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Payout Language (consumer-safe)</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{caseData.payout_language}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Source URLs */}
+        {(caseData.source_urls?.length ?? 0) > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <h2 className="font-semibold text-slate-900 text-sm mb-3 flex items-center gap-2">
+              <ExternalLink size={15} className="text-slate-400" /> Source References
+            </h2>
+            <ul className="space-y-1.5">
+              {caseData.source_urls!.map(url => (
+                <li key={url}>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-700 hover:text-blue-800 hover:underline break-all flex items-start gap-1.5"
+                  >
+                    <ExternalLink size={11} className="shrink-0 mt-1" /> {url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Doc requirements badge */}
         {caseData.require_medical_docs && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
