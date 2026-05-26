@@ -5,6 +5,13 @@ import { ProgressBar } from '../components/ProgressBar';
 import { FlowStepper } from '../components/FlowStepper';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  formatMultiSelectForDisplay,
+  multiSelectValuesForSave,
+  parseMultiSelectStored,
+  parseQuestionOptions,
+  serializeMultiSelect,
+} from '../lib/multiSelect';
 import type { Question } from '../types/database';
 
 const FLOW_STEPS = [
@@ -57,9 +64,15 @@ export default function Quiz() {
 
     const answerMap: Record<string, string> = {};
     (existingAns || []).forEach(a => {
-      answerMap[a.field_key] = a.answer_values?.length
-        ? a.answer_values.join(',')
-        : (a.answer_value || '');
+      const q = qData?.find(row => row.field_key === a.field_key);
+      const knownOptions = q ? parseQuestionOptions(q.answer_options) : [];
+      if (a.answer_values?.length) {
+        answerMap[a.field_key] = serializeMultiSelect(a.answer_values);
+      } else if (a.answer_value) {
+        answerMap[a.field_key] = serializeMultiSelect(
+          parseMultiSelectStored(a.answer_value, knownOptions),
+        );
+      }
     });
     setAnswers(answerMap);
 
@@ -69,10 +82,10 @@ export default function Quiz() {
 
   const currentQ = questions[step];
   const currentAnswer = currentQ ? (answers[currentQ.field_key] || '') : '';
-  const optionsArr: string[] = currentQ && Array.isArray(currentQ.answer_options)
-    ? (currentQ.answer_options as string[])
+  const optionsArr: string[] = currentQ ? parseQuestionOptions(currentQ.answer_options) : [];
+  const selectedMulti = currentQ
+    ? parseMultiSelectStored(currentAnswer, optionsArr)
     : [];
-  const selectedMulti = currentAnswer ? currentAnswer.split(',').filter(Boolean) : [];
 
   const handleAnswer = (value: string) => {
     if (!currentQ) return;
@@ -93,7 +106,7 @@ export default function Quiz() {
         ? without.filter(s => s !== option)
         : [...without, option];
     }
-    setAnswers(prev => ({ ...prev, [currentQ.field_key]: next.join(',') }));
+    setAnswers(prev => ({ ...prev, [currentQ.field_key]: serializeMultiSelect(next) }));
   };
 
   const handleNext = () => {
@@ -110,7 +123,8 @@ export default function Quiz() {
       const q = questions.find(q => q.field_key === fieldKey);
       if (!q) continue;
       const isMulti = q.question_type === 'multi_select';
-      const arr = isMulti ? value.split(',').filter(Boolean) : null;
+      const knownOptions = parseQuestionOptions(q.answer_options);
+      const arr = isMulti ? multiSelectValuesForSave(value, knownOptions) : null;
       await supabase.from('answers').upsert({
         user_id: user.id,
         question_id: q.id,
@@ -155,7 +169,7 @@ export default function Quiz() {
             {questions.map((q, idx) => {
               const val = answers[q.field_key];
               const display = q.question_type === 'multi_select'
-                ? (val ? val.split(',').filter(Boolean).join(', ') : '')
+                ? (val ? formatMultiSelectForDisplay(val, parseQuestionOptions(q.answer_options)) : '')
                 : val;
               return (
                 <div key={q.id} className={`px-5 py-4 flex items-start gap-3 ${idx < questions.length - 1 ? 'border-b border-slate-100' : ''}`}>

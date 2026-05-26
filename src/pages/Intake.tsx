@@ -5,6 +5,12 @@ import { ProgressBar } from '../components/ProgressBar';
 import { FlowStepper } from '../components/FlowStepper';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  multiSelectValuesForSave,
+  parseMultiSelectStored,
+  parseQuestionOptions,
+  serializeMultiSelect,
+} from '../lib/multiSelect';
 import type { Case, Question } from '../types/database';
 
 const FLOW_STEPS = [
@@ -56,11 +62,6 @@ export default function Intake() {
       .select('*')
       .eq('user_id', user!.id);
 
-    const answerMap: Record<string, string> = {};
-    (existingAns || []).forEach(a => { answerMap[a.field_key] = a.answer_value || ''; });
-    setExistingAnswers(answerMap);
-    setCurrentAnswers(answerMap);
-
     const intakeQs: IntakeQuestion[] = (caseQs || []).map((cq: any) => ({
       ...(cq['questions!case_questions_question_id_fkey'] || cq.questions),
       required_for_case: cq.required_for_case,
@@ -70,6 +71,21 @@ export default function Intake() {
     }));
 
     setQuestions(intakeQs);
+
+    const answerMap: Record<string, string> = {};
+    (existingAns || []).forEach(a => {
+      const q = intakeQs.find(row => row.field_key === a.field_key);
+      const knownOptions = q ? parseQuestionOptions(q.answer_options) : [];
+      if (a.answer_values?.length) {
+        answerMap[a.field_key] = serializeMultiSelect(a.answer_values);
+      } else if (a.answer_value) {
+        answerMap[a.field_key] = serializeMultiSelect(
+          parseMultiSelectStored(a.answer_value, knownOptions),
+        );
+      }
+    });
+    setExistingAnswers(answerMap);
+    setCurrentAnswers(answerMap);
 
     // Compute visible questions at load time (using the pre-loaded answerMap for conditions)
     const visibleAtLoad = intakeQs.filter(q => {
@@ -102,12 +118,15 @@ export default function Intake() {
 
   const handleMultiSelect = (value: string) => {
     if (!currentQ) return;
-    const current = currentAnswers[currentQ.field_key] || '';
-    const selected = current ? current.split(',') : [];
+    const options = parseQuestionOptions(currentQ.answer_options);
+    const selected = parseMultiSelectStored(currentAnswers[currentQ.field_key] || '', options);
     const idx = selected.indexOf(value);
     if (idx > -1) selected.splice(idx, 1);
     else selected.push(value);
-    setCurrentAnswers(prev => ({ ...prev, [currentQ.field_key]: selected.join(',') }));
+    setCurrentAnswers(prev => ({
+      ...prev,
+      [currentQ.field_key]: serializeMultiSelect(selected),
+    }));
   };
 
   const handleNext = async () => {
@@ -140,12 +159,16 @@ export default function Intake() {
     for (const q of visibleQuestions) {
       const val = currentAnswers[q.field_key];
       if (!val) continue;
+      const isMulti = q.question_type === 'multi_select';
+      const knownOptions = parseQuestionOptions(q.answer_options);
+      const multiValues = isMulti ? multiSelectValuesForSave(val, knownOptions) : null;
       await supabase.from('answers').upsert({
         user_id: user.id,
         submission_id: submission?.id,
         question_id: q.id,
         field_key: q.field_key,
-        answer_value: val,
+        answer_value: isMulti ? null : val,
+        answer_values: multiValues,
       }, { onConflict: 'user_id,question_id' });
     }
 
@@ -182,8 +205,8 @@ export default function Intake() {
   if (!q) return null;
   const currentVal = currentAnswers[q.field_key] || '';
   const isAlreadyAnswered = !!existingAnswers[q.field_key];
-  const optionsArr: string[] = Array.isArray(q.answer_options) ? q.answer_options as string[] : [];
-  const selectedMulti = currentVal ? currentVal.split(',') : [];
+  const optionsArr: string[] = parseQuestionOptions(q.answer_options);
+  const selectedMulti = parseMultiSelectStored(currentVal, optionsArr);
 
   // date_range stores as "YYYY-MM-DD|YYYY-MM-DD"
   const [dateRangeStart, dateRangeEnd] = q.question_type === 'date_range' && currentVal.includes('|')
