@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Search, DollarSign, Scale, X, SlidersHorizontal, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MatchBadge } from '../components/MatchBadge';
+import { trackBrowseCases } from '../lib/metaPixel';
 import type { Case, MatchTier } from '../types/database';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -23,11 +24,18 @@ export default function Browse() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const browseTracked = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
     loadData();
   }, [user, authLoading]);
+
+  useEffect(() => {
+    if (browseTracked.current) return;
+    browseTracked.current = true;
+    trackBrowseCases();
+  }, []);
 
   const loadData = async () => {
     const [casesRes, subsRes] = await Promise.all([

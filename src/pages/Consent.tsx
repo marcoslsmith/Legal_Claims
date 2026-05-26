@@ -4,6 +4,7 @@ import { Shield, AlertCircle } from 'lucide-react';
 import { FlowStepper } from '../components/FlowStepper';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { trackClaimSubmitted } from '../lib/metaPixel';
 
 const FLOW_STEPS = [
   { label: 'Eligibility' },
@@ -30,6 +31,7 @@ export default function Consent() {
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [submissionStatus, setSubmissionStatus] = useState<string | null>(null);
   const [priorAttorneyForCase, setPriorAttorneyForCase] = useState<'yes' | 'no' | ''>('');
+  const [caseName, setCaseName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
@@ -37,7 +39,8 @@ export default function Consent() {
   }, [user, slug]);
 
   const loadSubmission = async () => {
-    const { data: caseRow } = await supabase.from('cases').select('id').eq('slug', slug).maybeSingle();
+    const { data: caseRow } = await supabase.from('cases').select('id, name').eq('slug', slug).maybeSingle();
+    if (caseRow?.name) setCaseName(caseRow.name);
     if (!caseRow) return;
     const { data: sub } = await supabase.from('submissions').select('id, status, prior_attorney_for_case').eq('user_id', user!.id).eq('case_id', caseRow.id).maybeSingle();
     if (sub) {
@@ -96,6 +99,8 @@ export default function Consent() {
       setSubmitting(false);
       return;
     }
+
+    if (slug) trackClaimSubmitted(slug, caseName || undefined);
 
     setSubmitting(false);
     navigate(`/confirmation/${slug}`);

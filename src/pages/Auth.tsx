@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Scale, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { trackRegistrationComplete, updateMetaAdvancedMatching } from '../lib/metaPixel';
 
 export default function Auth() {
   const [params] = useSearchParams();
@@ -43,6 +44,15 @@ export default function Auth() {
     setLoading(false);
     if (err) {
       setError(err.message || 'An error occurred. Please try again.');
+      return;
+    }
+    if (isSignUp) {
+      trackRegistrationComplete();
+      updateMetaAdvancedMatching({
+        email,
+        firstName: fullName.trim().split(/\s+/)[0],
+        lastName: fullName.trim().split(/\s+/).slice(1).join(' '),
+      });
     }
     // navigation is handled by the useEffect once profile loads
   };

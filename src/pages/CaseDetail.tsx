@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, FileText, ArrowRight, Upload, MapPin, Calendar,
@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MatchBadge } from '../components/MatchBadge';
 import { StatusBadge } from '../components/StatusBadge';
+import { trackCaseViewed } from '../lib/metaPixel';
 import type { Case, Submission, UploadedDocument, MatchTier } from '../types/database';
 
 interface SubWithDocs extends Submission {
@@ -23,10 +24,17 @@ export default function CaseDetail() {
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [submission, setSubmission] = useState<SubWithDocs | null>(null);
   const [loading, setLoading] = useState(true);
+  const viewTrackedSlug = useRef<string | null>(null);
 
   useEffect(() => {
     if (slug && user) loadData();
   }, [slug, user]);
+
+  useEffect(() => {
+    if (!caseData?.slug || viewTrackedSlug.current === caseData.slug) return;
+    viewTrackedSlug.current = caseData.slug;
+    trackCaseViewed(caseData.slug, caseData.name);
+  }, [caseData?.slug, caseData?.name]);
 
   const loadData = async () => {
     const [caseRes, subRes] = await Promise.all([

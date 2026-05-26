@@ -12,6 +12,7 @@ import {
   parseQuestionOptions,
   serializeMultiSelect,
 } from '../lib/multiSelect';
+import { trackEligibilityQuizComplete } from '../lib/metaPixel';
 import type { Question } from '../types/database';
 
 const FLOW_STEPS = [
@@ -136,6 +137,7 @@ export default function Quiz() {
     if (answers['state_of_residence']) {
       await supabase.from('profiles').update({ state: answers['state_of_residence'] }).eq('id', user.id);
     }
+    trackEligibilityQuizComplete();
     setSaving(false);
     navigate('/contact');
   };

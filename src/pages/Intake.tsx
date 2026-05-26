@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
 import { ProgressBar } from '../components/ProgressBar';
@@ -11,6 +11,7 @@ import {
   parseQuestionOptions,
   serializeMultiSelect,
 } from '../lib/multiSelect';
+import { trackIntakeStarted } from '../lib/metaPixel';
 import type { Case, Question } from '../types/database';
 
 const FLOW_STEPS = [
@@ -40,11 +41,18 @@ export default function Intake() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const intakeTrackedSlug = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/auth'); return; }
     loadData();
   }, [user, slug]);
+
+  useEffect(() => {
+    if (!caseData?.slug || intakeTrackedSlug.current === caseData.slug) return;
+    intakeTrackedSlug.current = caseData.slug;
+    trackIntakeStarted(caseData.slug, caseData.name);
+  }, [caseData?.slug, caseData?.name]);
 
   const loadData = async () => {
     const { data: caseRow } = await supabase.from('cases').select('*').eq('slug', slug).maybeSingle();

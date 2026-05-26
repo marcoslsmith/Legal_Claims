@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { MetaPixel } from './components/MetaPixel';
 import { Layout } from './components/Layout';
 import { AdminLayout } from './pages/admin/AdminLayout';
 
@@ -79,6 +80,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <MetaPixel />
         <AppRoutes />
       </AuthProvider>
     </BrowserRouter>

@@ -4,6 +4,7 @@ import { ArrowRight, User, Mail, Phone, Shield, DollarSign, Scale, CheckCircle }
 import { FlowStepper } from '../components/FlowStepper';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { trackLeadCaptured, updateMetaAdvancedMatching } from '../lib/metaPixel';
 
 const FLOW_STEPS = [
   { label: 'Eligibility' },
@@ -92,6 +93,15 @@ export default function Contact() {
       phone: phone.replace(/\D/g, ''),
       updated_at: new Date().toISOString(),
     }).eq('id', user.id);
+
+    updateMetaAdvancedMatching({
+      email: email.trim(),
+      phone: phone.replace(/\D/g, ''),
+      firstName: fullName.trim().split(/\s+/)[0],
+      lastName: fullName.trim().split(/\s+/).slice(1).join(' '),
+      externalId: user.id,
+    });
+    trackLeadCaptured();
 
     setSaving(false);
     navigate('/results');
