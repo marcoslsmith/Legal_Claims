@@ -101,7 +101,13 @@ export default function Contact() {
       lastName: fullName.trim().split(/\s+/).slice(1).join(' '),
       externalId: user.id,
     });
-    trackLeadCaptured();
+    trackLeadCaptured({
+      email: email.trim(),
+      phone: phone.replace(/\D/g, ''),
+      firstName: fullName.trim().split(/\s+/)[0],
+      lastName: fullName.trim().split(/\s+/).slice(1).join(' '),
+      externalId: user.id,
+    });
 
     setSaving(false);
     navigate('/results');

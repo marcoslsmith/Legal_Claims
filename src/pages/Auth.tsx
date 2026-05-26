@@ -47,12 +47,10 @@ export default function Auth() {
       return;
     }
     if (isSignUp) {
-      trackRegistrationComplete();
-      updateMetaAdvancedMatching({
-        email,
-        firstName: fullName.trim().split(/\s+/)[0],
-        lastName: fullName.trim().split(/\s+/).slice(1).join(' '),
-      });
+      const firstName = fullName.trim().split(/\s+/)[0];
+      const lastName = fullName.trim().split(/\s+/).slice(1).join(' ');
+      trackRegistrationComplete('email', { email, firstName, lastName });
+      updateMetaAdvancedMatching({ email, firstName, lastName });
     }
     // navigation is handled by the useEffect once profile loads
   };

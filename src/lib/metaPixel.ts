@@ -171,10 +171,19 @@ export function updateMetaAdvancedMatching(userData: MetaUserData): void {
 }
 
 export function trackMetaPageView(): void {
-  if (!isMetaPixelEnabled() || typeof window.fbq !== 'function') return;
+  if (!isMetaPixelEnabled()) return;
   const path = window.location.pathname;
   if (isExcludedMetaPath(path)) return;
-  window.fbq('track', 'PageView');
+
+  const eventID = createMetaEventId();
+  if (typeof window.fbq === 'function') {
+    window.fbq('track', 'PageView', {}, { eventID });
+  }
+
+  // Dynamic import avoids circular dependency with metaPixelCapi
+  void import('./metaPixelCapi').then(({ sendMetaCapiEvent }) => {
+    sendMetaCapiEvent({ event_name: 'PageView', event_id: eventID });
+  });
 }
 
 export function trackMetaStandard(
@@ -211,58 +220,143 @@ export function trackMetaCustom(
 
 // --- Funnel events (use in pages) ---
 
-export function trackRegistrationComplete(method: 'email' = 'email') {
-  trackMetaStandard('CompleteRegistration', {
-    status: true,
-    content_name: 'ClaimFinder Account',
-    registration_method: method,
+export function trackRegistrationComplete(
+  method: 'email' = 'email',
+  userData?: MetaUserData,
+) {
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = {
+      status: true,
+      content_name: 'ClaimFinder Account',
+      registration_method: method,
+    };
+    trackBrowserAndCapi(
+      'standard',
+      'CompleteRegistration',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'CompleteRegistration', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data, user_data: userData },
+    );
   });
 }
 
 export function trackEligibilityQuizComplete() {
-  trackMetaCustom('EligibilityQuizComplete', {
-    content_name: 'General Eligibility Quiz',
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = { content_name: 'General Eligibility Quiz' };
+    trackBrowserAndCapi(
+      'custom',
+      'EligibilityQuizComplete',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('trackCustom', 'EligibilityQuizComplete', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data },
+    );
   });
 }
 
-export function trackLeadCaptured() {
-  trackMetaStandard('Lead', {
-    content_name: 'Contact Information',
-    content_category: 'Legal Lead',
+export function trackLeadCaptured(userData?: MetaUserData) {
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = {
+      content_name: 'Contact Information',
+      content_category: 'Legal Lead',
+    };
+    trackBrowserAndCapi(
+      'standard',
+      'Lead',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'Lead', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data, user_data: userData },
+    );
   });
 }
 
 export function trackIntakeStarted(caseSlug: string, caseName?: string) {
-  trackMetaStandard('InitiateCheckout', {
-    content_name: caseName || caseSlug,
-    content_ids: [caseSlug],
-    content_type: 'legal_claim',
-    content_category: 'Case Intake',
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = {
+      content_name: caseName || caseSlug,
+      content_ids: [caseSlug],
+      content_type: 'legal_claim',
+      content_category: 'Case Intake',
+    };
+    trackBrowserAndCapi(
+      'standard',
+      'InitiateCheckout',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'InitiateCheckout', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data },
+    );
   });
 }
 
 export function trackCaseViewed(caseSlug: string, caseName?: string) {
-  trackMetaStandard('ViewContent', {
-    content_name: caseName || caseSlug,
-    content_ids: [caseSlug],
-    content_type: 'legal_claim',
-    content_category: 'Case Detail',
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = {
+      content_name: caseName || caseSlug,
+      content_ids: [caseSlug],
+      content_type: 'legal_claim',
+      content_category: 'Case Detail',
+    };
+    trackBrowserAndCapi(
+      'standard',
+      'ViewContent',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'ViewContent', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data },
+    );
   });
 }
 
 export function trackBrowseCases() {
-  trackMetaStandard('Search', {
-    content_name: 'Browse Active Claims',
-    content_category: 'Legal Claims',
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = {
+      content_name: 'Browse Active Claims',
+      content_category: 'Legal Claims',
+    };
+    trackBrowserAndCapi(
+      'standard',
+      'Search',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'Search', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data },
+    );
   });
 }
 
 export function trackClaimSubmitted(caseSlug: string, caseName?: string) {
-  trackMetaStandard('SubmitApplication', {
-    content_name: caseName || caseSlug,
-    content_ids: [caseSlug],
-    content_type: 'legal_claim',
-    content_category: 'Claim Submission',
-    status: true,
+  void import('./metaPixelCapi').then(({ trackBrowserAndCapi }) => {
+    const custom_data = {
+      content_name: caseName || caseSlug,
+      content_ids: [caseSlug],
+      content_type: 'legal_claim',
+      content_category: 'Claim Submission',
+      status: true,
+    };
+    trackBrowserAndCapi(
+      'standard',
+      'SubmitApplication',
+      (eventId) => {
+        if (typeof window.fbq === 'function') {
+          window.fbq('track', 'SubmitApplication', custom_data, { eventID: eventId });
+        }
+      },
+      { custom_data },
+    );
   });
 }

@@ -12,8 +12,8 @@
     "supabase:login": "npx supabase@latest login",
     "supabase:link": "npx supabase@latest link",
     "supabase:db:push": "npx supabase@latest db push",
-    "supabase:functions:deploy": "npx supabase@latest functions deploy parse-case-document",
-    "supabase:deploy": "npx supabase@latest db push && npx supabase@latest functions deploy parse-case-document"
+    "supabase:functions:deploy": "npx supabase@latest functions deploy parse-case-document && npx supabase@latest functions deploy meta-capi",
+    "supabase:deploy": "npx supabase@latest db push && npm run supabase:functions:deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
