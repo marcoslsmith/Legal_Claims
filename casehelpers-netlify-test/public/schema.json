@@ -1,0 +1,116 @@
+{
+  "consentVersion": "preview-2",
+  "consentText": "I agree to receive a live call from CaseHelpers at the number I provide about my SSDI inquiry. CaseHelpers may use my answers to discuss options for getting help and will ask my permission before sharing them with an independent disability representative.",
+  "questions": [
+    {
+      "key": "benefits",
+      "stage": "Benefits status",
+      "label": "Are you currently receiving SSDI or another benefit?",
+      "options": [
+        "Yes, SSDI",
+        "Yes, another benefit",
+        "No",
+        "I’m not sure"
+      ]
+    },
+    {
+      "key": "duration",
+      "stage": "Duration",
+      "label": "Has your condition kept you from doing substantial work for at least 12 months, or do you expect it to?",
+      "options": [
+        "Yes",
+        "No",
+        "I’m not sure"
+      ]
+    },
+    {
+      "key": "work",
+      "stage": "Work history",
+      "label": "Did you work in at least 5 of the past 10 years?",
+      "options": [
+        "Yes",
+        "No",
+        "I’m not sure"
+      ]
+    },
+    {
+      "key": "representation",
+      "stage": "Representation",
+      "label": "Is an attorney or disability representative already helping with your claim?",
+      "options": [
+        "Yes",
+        "No",
+        "I’m not sure"
+      ]
+    },
+    {
+      "key": "treatment",
+      "stage": "Medical treatment",
+      "label": "Are you currently getting medical care for the condition that affects your ability to work?",
+      "options": [
+        "Yes",
+        "No",
+        "I’m not sure"
+      ]
+    },
+    {
+      "key": "lastWorked",
+      "stage": "Most recent work",
+      "label": "When did you last work?",
+      "options": [
+        "I’m currently working",
+        "Within the past year",
+        "1 to 5 years ago",
+        "More than 5 years ago",
+        "I’ve never worked",
+        "I’m not sure"
+      ]
+    },
+    {
+      "key": "employment",
+      "stage": "Work today",
+      "label": "Are you currently working?",
+      "options": [
+        "No",
+        "Yes, part-time",
+        "Yes, full-time",
+        "I’m on leave",
+        "I’m not sure how to answer"
+      ]
+    },
+    {
+      "key": "age",
+      "stage": "About you",
+      "label": "What is your age range?",
+      "options": [
+        "Under 18",
+        "18–39",
+        "40–49",
+        "50–59",
+        "60–61",
+        "62 or older"
+      ]
+    },
+    {
+      "key": "documented",
+      "stage": "Medical documentation",
+      "label": "Has a healthcare provider documented the condition that limits your ability to work?",
+      "options": [
+        "Yes",
+        "No",
+        "I’m not sure"
+      ]
+    }
+  ],
+  "attributionKeys": [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_content",
+    "utm_term",
+    "utm_id",
+    "fbclid",
+    "gclid",
+    "msclkid"
+  ]
+}
