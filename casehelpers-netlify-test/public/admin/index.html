@@ -1,1 +1,84 @@
-<!doctype html><title>CaseHelpers staff dashboard</title>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CaseHelpers · Staff workspace</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <script type="module" src="/admin/app.js"></script>
+</head>
+<body>
+  <header>
+    <a href="/admin/" class="brand">
+      CaseHelpers <small>STAFF WORKSPACE</small>
+    </a>
+    <button id="logout" hidden>Sign out</button>
+  </header>
+
+  <main>
+    <section id="login">
+      <p class="eyebrow">PRIVATE INTAKE OPERATIONS</p>
+      <h1>Welcome back.</h1>
+      <p>Sign in with your approved staff account to manage callbacks.</p>
+      <form id="signin">
+        <label>Email
+          <input type="email" name="email" autocomplete="username"
+                 required maxlength="254">
+        </label>
+        <label>Password
+          <input type="password" name="password"
+                 autocomplete="current-password" required maxlength="1024">
+        </label>
+        <button>Sign in securely</button>
+      </form>
+    </section>
+
+    <p id="message" role="status" aria-live="polite"></p>
+
+    <section id="workspace" hidden>
+      <div class="heading">
+        <div>
+          <p class="eyebrow">CALLBACK QUEUE</p>
+          <h1>Every request. A next step.</h1>
+          <p id="sync">Connecting…</p>
+        </div>
+        <div>
+          <button id="alerts">Enable device alerts</button>
+          <button id="export">Export filtered CSV</button>
+        </div>
+      </div>
+
+      <p class="notice" id="new" role="status" hidden></p>
+
+      <div class="filters">
+        <label>Search name or phone
+          <input id="search" type="search" placeholder="Find a submission">
+        </label>
+        <label>Callback status
+          <select id="status">
+            <option value="">All statuses</option>
+            <option value="pending_callback">Pending callback</option>
+            <option value="attempted">Attempted</option>
+            <option value="completed">Completed</option>
+          </select>
+        </label>
+        <label>Campaign
+          <input id="campaign" placeholder="Exact campaign name">
+        </label>
+        <button id="refresh">Refresh</button>
+      </div>
+
+      <p id="count"></p>
+
+      <div class="layout">
+        <section id="leads" aria-label="Submissions"></section>
+        <section id="detail" aria-label="Submission details">
+          <p>Select a submission to review its details.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer>Private claimant records · Staff access only</footer>
+</body>
+</html>
