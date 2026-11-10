@@ -39,8 +39,14 @@ function screen(answers) {
   let status = 'possible_match';
   if (mismatches.length) status = 'likely_outside_intake_criteria';
   else if (review.length) status = 'needs_review';
+  const reasons = {
+    possible_match: 'All online checks passed based on self-reported answers. Staff must still verify claim stage, any appeal deadline, and work credits.',
+    needs_review: 'One or more answers need clarification. Review the flagged items during the callback.',
+    likely_outside_intake_criteria: 'One or more answers conflict with the initial intake criteria. Confirm the flagged answers during the callback.',
+  };
   return {
-    version: 'dag-initial-2026-11-03-v2',
+    version: 'dag-initial-2026-11-03-v3',
+    reason: reasons[status],
     status,
     reported_mismatches: mismatches,
     review_items: review,
