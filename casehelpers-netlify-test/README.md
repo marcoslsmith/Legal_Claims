@@ -37,3 +37,26 @@ This folder is a standalone Netlify build. On a review branch of Legal_Claims, c
 2. In Netlify’s environment variables for the staging deploy only, set `CASEHELPERS_SUPABASE_URL` to the project URL and `CASEHELPERS_SUPABASE_SECRET` to a Supabase secret API key. Use Functions scope. Set `CASEHELPERS_ALLOWED_ORIGIN` to the exact preview origin (HTTPS, no trailing slash), `CASEHELPERS_SIGNING_KEY` to a random secret of at least 32 bytes, and `CASEHELPERS_INTAKE_ENABLED` to `true`. Enter secrets directly in Netlify. Never commit them or share them in chat. Redeploy staging.
 3. Submit a fictional test lead. In Supabase open **Table Editor → casehelpers_callback_queue**. Verify name, phone, consent, screening status and campaign tags. Verify a retry creates only one row. Check that the public API cannot list queue records and the stage endpoint cannot write without consent. This starter stores the queue only. It has no alerts or staff callback dashboard. Table Editor requires privileged access and should be limited to authorized operators.
 4. Before production, configure private staff notifications and callback coverage, retention and access controls, finalize legal copy and screening rules, and test with fictional data. Update the preview label and confirmation copy so they accurately describe live storage. Keep intake disabled in production until those steps are complete.
+
+## Staff dashboard
+
+The existing Netlify deployment serves the dashboard at `/admin/`. Apply
+`admin-migration.sql` in the Supabase project that already contains
+`casehelpers_callback_queue`. Invite staff through Supabase Auth, then insert
+each approved Auth user UUID into `public.casehelpers_staff` as a database
+administrator. Remove that row to revoke queue access on the next request.
+Set `CASEHELPERS_SUPABASE_PUBLISHABLE_KEY` in Netlify's Functions environment
+for the same Supabase project. Keep the intake secret scoped to Functions.
+The admin API uses the publishable key and the signed-in staff member's token.
+Sessions expire after at most one hour and staff sign in again when needed.
+
+The open dashboard checks for new submissions every five seconds. Alerts
+contain no claimant details. Device alerts depend on browser support and
+permission. A closed dashboard does not receive alerts. Exports include
+contact information and should be handled as private claimant records.
+
+Before production rollout, use fictional records in a restricted test
+deployment. Verify anonymous and signed-in non-staff accounts cannot read
+or change leads or notes, staff can do both, and the existing intake function
+still inserts one row per request ID. Verify receipt, status edits, notes,
+filtering, CSV and alerts in two separate staff sessions.
