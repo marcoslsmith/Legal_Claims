@@ -1,0 +1,37 @@
+name: CaseHelpers dashboard checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "casehelpers-netlify-test/**"
+      - ".github/workflows/casehelpers-dashboard.yml"
+  push:
+    branches: [main, casehelpers-staff-dashboard]
+    paths:
+      - "casehelpers-netlify-test/**"
+      - ".github/workflows/casehelpers-dashboard.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-tests:
+    name: Security and export tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get repository files
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Check dashboard code
+        run: |
+          node --check casehelpers-netlify-test/public/admin/app.js
+          node --check casehelpers-netlify-test/public/admin/csv.js
+
+      - name: Run security and export tests
+        run: node --test casehelpers-netlify-test/tests/staff.test.mjs
