@@ -1,6 +1,6 @@
 {
-  "consentVersion": "preview-2",
-  "consentText": "I agree to receive a live call from CaseHelpers at the number I provide about my SSDI inquiry. CaseHelpers may use my answers to discuss options for getting help and will ask my permission before sharing them with an independent disability representative.",
+  "consentVersion": "callback-consent-1",
+  "consentText": "I request a live phone call from CaseHelpers at the number I entered about my SSDI inquiry. CaseHelpers may use my answers to prepare for the call and discuss options for getting help. CaseHelpers will ask for my separate permission before sharing my contact information or answers with an independent attorney or disability representative.",
   "questions": [
     {
       "key": "benefits",

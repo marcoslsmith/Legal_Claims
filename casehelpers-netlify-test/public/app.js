@@ -61,7 +61,7 @@ async function start() {
         <label class="contact">U.S. phone number <input type="tel" name="phone" autocomplete="tel" required maxlength="25"></label>
         <label class="consent"><input type="checkbox" name="consent" required><span id="consent-copy"></span></label>
         <div class="trap" aria-hidden="true"><label>Leave blank <input name="website" tabindex="-1" autocomplete="off"></label></div>
-        <p class="small">Review the <a href="/privacy.html" target="_blank" rel="noopener">draft privacy notice</a> and <a href="/terms.html" target="_blank" rel="noopener">draft terms</a> (opens in a new tab).</p>`;
+        <p class="small">Review the <a href="/privacy.html" target="_blank" rel="noopener">privacy notice</a> and <a href="/terms.html" target="_blank" rel="noopener">terms of use</a> (opens in a new tab).</p>`;
       get('consent-copy').textContent = consentText;
       form.elements.name.value = contact.name;
       form.elements.phone.value = contact.phone;
@@ -136,7 +136,7 @@ async function start() {
       }
       get('flow').hidden = true;
       const thanks = get('thanks');
-      thanks.innerHTML = '<h2 tabindex="-1">Request received.</h2><p>Your test submission reached the preview intake queue. In the live workflow, the CaseHelpers team would call you next at the number you provided.</p><a href="/">Start a new test</a>';
+      thanks.innerHTML = '<h2 tabindex="-1">Request received.</h2><p>A member of the CaseHelpers team will call you at the number you provided to discuss your request.</p><a href="/">Return to CaseHelpers</a>';
       thanks.hidden = false;
       thanks.querySelector('h2').focus();
     } catch {
@@ -153,6 +153,7 @@ async function start() {
 
 start().catch(() => {
   const notice = get('preview');
+  notice.hidden = false;
   notice.setAttribute('role', 'alert');
   notice.textContent = 'The callback form could not load. Please refresh to try again.';
 });
