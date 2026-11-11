@@ -39,7 +39,7 @@ async function start() {
     get('progress').value = step + 1;
     error.hidden = true;
     back.hidden = step === 0;
-    next.textContent = question ? 'Continue →' : 'Request my callback →';
+    next.textContent = question ? 'Continue →' : 'Get my free callback →';
     fields.replaceChildren();
     if (question) {
       const group = document.createElement('fieldset');
@@ -144,7 +144,7 @@ async function start() {
     } finally {
       busy = false;
       next.disabled = back.disabled = false;
-      next.textContent = 'Request my callback →';
+      next.textContent = 'Get my free callback →';
     }
   });
   get('flow').hidden = false;
