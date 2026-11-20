@@ -9,6 +9,11 @@ function response(status, body) {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
+function empty(status) {
+  // 204 responses cannot carry a JSON body.
+  return new Response(null, { status, headers: { 'Cache-Control': 'no-store' } });
+}
+
 export default async function handler(request) {
   // Same explicit activation and configuration as the intake handler.
   if (env.CASEHELPERS_INTAKE_ENABLED !== 'true'
@@ -22,7 +27,7 @@ export default async function handler(request) {
   // Count real page loads only, never prefetches or prerenders.
   const purpose = ['purpose', 'sec-purpose', 'x-purpose', 'x-moz']
     .map(name => request.headers.get(name) ?? '').join(' ').toLowerCase();
-  if (/prefetch|prerender|preview/.test(purpose)) return response(204, {});
+  if (/prefetch|prerender|preview/.test(purpose)) return empty(204);
 
   let body;
   try {
