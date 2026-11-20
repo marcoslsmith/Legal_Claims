@@ -6,5 +6,9 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
+// PageView measurement only. Automatic Events (button clicks, page metadata
+// scraping) disabled below; Automatic Advanced Matching is OFF in Meta Events
+// Manager. Never send form answers, contact details, or custom events.
+fbq('set', 'autoConfig', false, '1157601686842447');
 fbq('init', '1157601686842447');
 fbq('track', 'PageView');
